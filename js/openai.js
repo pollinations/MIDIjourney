@@ -47,11 +47,11 @@ async function getChatGptResponse(
   abortController = new AbortController();
 
   try {
-    const chat = await openAIApi("dummy").createChatCompletion(
+    const chat = await openAIApi().createChatCompletion(
       {
-        model: "claude",
+        model: "gemini-large",
         messages,
-        // temperature,
+        temperature,
         // max_tokens: MAX_TOKENS,
       },
       { signal: abortController.signal }
@@ -80,9 +80,16 @@ async function getChatGptResponse(
 
 let abortController = null;
 
-// Initialize the OpenAI API object
+// API Key for enter.pollinations.ai
+// Get your key at https://enter.pollinations.ai
+const API_KEY = process.env.POLLINATIONS_API_KEY || "";
+
+// Initialize the OpenAI API object with enter.pollinations.ai
 const openAIApi = () => {
-  return new OpenAIApi(new Configuration({ basePath: "https://text.pollinations.ai/openai" }));
+  return new OpenAIApi(new Configuration({ 
+    basePath: "https://enter.pollinations.ai/api/generate/v1",
+    apiKey: API_KEY
+  }));
 };
 
 // Print messages to the console
