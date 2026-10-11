@@ -4,14 +4,10 @@ Compose MIDI through conversation, bring a selected clip into the chat, and turn
 ideas into clips in Ableton Live. Midi Journey 2 adds a piano-roll preview,
 light/dark themes, browser sign-in, and a self-contained Max for Live device.
 
-**Coming soon — the new download is not published yet.** Local acceptance is
-complete, including the remaining checks confirmed by the maintainer on
-October 11, 2026.
-
 ## Downloads
 
-- **Midi Journey 2:** release preparation in progress.
-- **Midi Journey Legacy:** [original 2024 download](https://github.com/pollinations/MIDIjourney/releases/tag/v2.0.0), preserved unchanged. Its old service compatibility is not guaranteed; no updated Legacy device is planned.
+- **Midi Journey 2:** [Download ZIP](https://github.com/pollinations/MIDIjourney/releases/download/v3.0.0/Midi-Journey-2.zip) · [Release notes](https://github.com/pollinations/MIDIjourney/releases/tag/v3.0.0). Unzip and load **Midi Journey 2.amxd** on Main in Live.
+- **Midi Journey Legacy:** [Download original device](https://github.com/pollinations/MIDIjourney/releases/download/v2.0.0/MIDIjourney.amxd) · [2024 release notes](https://github.com/pollinations/MIDIjourney/releases/tag/v2.0.0). Preserved unchanged; compatibility with current services is not guaranteed.
 
 Midi Journey 2 is the product name. The release version is **3.0.0**, avoiding
 reuse of the original download's `v2.0.0` tag.
