@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createChatSession } from "../src/chat-session.mjs";
-import {
-	LEGACY_KEY,
-	loadChat,
-	normalizeChat,
-	SESSION_KEY,
-	saveChat,
-} from "../src/session.mjs";
+import { freshChat, normalizeChat } from "../src/session.mjs";
 
 const result = {
 	title: "A small phrase",
@@ -97,6 +91,14 @@ test("new chat removes both visible replies and model context, not Live clips", 
 	assert.deepEqual(job.input.history, []);
 	job.resolve({ ...result, history });
 	await promise;
+});
+test("opening and resetting a conversation never generate a welcome API call", () => {
+	const h = harness();
+	assert.equal(h.jobs.length, 0);
+	assert.deepEqual(h.session.getSnapshot().context, []);
+	h.session.newChat();
+	assert.equal(h.jobs.length, 0);
+	assert.equal(h.writes.length, 0);
 });
 test("follow-ups keep conversation context and every MIDI reply remains sendable", async () => {
 	const h = harness(),
@@ -210,35 +212,14 @@ test("errors stay with their turn and the composer can be used again", async () 
 	await h.finish("Try another idea");
 	assert.equal(h.session.getSnapshot().turns.length, 2);
 });
-test("legacy prototype history is discarded without touching account/theme/other versions", () => {
-	const data = new Map([
-		[LEGACY_KEY, '{"prompt":"old","history":[1]}'],
-		["sdk:token", "unchanged"],
-		["theme", "dark"],
-		["midijourney:web", "preserved"],
-	]);
-	const storage = {
-		getItem: (key) => data.get(key),
-		removeItem: (key) => data.delete(key),
-		setItem: (key, value) => data.set(key, value),
-	};
-	assert.deepEqual(loadChat(storage).turns, []);
-	assert.equal(data.has(LEGACY_KEY), false);
-	assert.equal(data.get("sdk:token"), "unchanged");
-	assert.equal(data.get("theme"), "dark");
-	assert.equal(data.get("midijourney:web"), "preserved");
-	assert.equal(
-		saveChat(storage, {
-			draft: "new",
-			context: history,
-			turns: [{ id: "a", prompt: "new", result, calls: [] }],
-		}),
-		true,
-	);
-	assert.equal(loadChat(storage).turns[0].result.notes[0].pitch, 60);
-	assert.equal(data.has(SESSION_KEY), true);
+test("each load creates independent empty memory-only conversation state", () => {
+	const first = freshChat();
+	first.draft = "A melody";
+	first.turns.push({ prompt: "hello" });
+	first.context.push({ role: "user", content: "hello" });
+	assert.deepEqual(freshChat(), { draft: "", turns: [], context: [] });
 });
-test("saved chat rejects invalid MIDI, preserves long attributed explanations, strips extra fields", () => {
+test("chat normalization rejects invalid MIDI, bounds explanations and strips extra fields", () => {
 	const valid = normalizeChat({
 		apiKey: "never-store",
 		turns: [
@@ -252,7 +233,7 @@ test("saved chat rejects invalid MIDI, preserves long attributed explanations, s
 			},
 		],
 	});
-	assert.match(valid.turns[0].result.explanation, /Model: fixture/);
+	assert.equal(valid.turns[0].result.explanation.length, 1000);
 	assert.equal("apiKey" in valid, false);
 	const invalid = normalizeChat({
 		turns: [{ prompt: "x", result: { ...result, notes: [{ pitch: -1 }] } }],
@@ -311,13 +292,17 @@ test("effect cleanup cancels pending work and reactivation can start a new reque
 	assert.equal(h.session.getSnapshot().turns[1].status, "complete");
 });
 
-test("unavailable storage shows a warning without losing the in-memory draft", () => {
-	assert.equal(saveChat(null, normalizeChat(null)), false);
-	const session = createChatSession({
-		initial: normalizeChat(null),
-		save: () => false,
-	});
+test("a fresh chat works without storage and never inherits another instance's draft", () => {
+	const storage = {
+		removeItem() {
+			throw new Error("Storage unavailable");
+		},
+	};
+	const session = createChatSession({ initial: freshChat(storage) });
 	session.setDraft("Still usable");
 	assert.equal(session.getSnapshot().draft, "Still usable");
-	assert.equal(session.getSnapshot().storageWarning, true);
+	const next = createChatSession({ initial: freshChat(null) });
+	assert.equal(next.getSnapshot().draft, "");
+	assert.deepEqual(next.getSnapshot().turns, []);
+	assert.deepEqual(next.getSnapshot().context, []);
 });

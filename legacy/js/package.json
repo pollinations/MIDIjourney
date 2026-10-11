@@ -1,0 +1,22 @@
+{
+  "name": "midi-journey",
+  "version": "2.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@tonaljs/tonal": "^4.10.0",
+    "configstore": "^6.0.0",
+    "dotenv": "^16.3.1",
+    "js-yaml": "^4.1.0",
+    "node-abort-controller": "^3.1.1",
+    "openai": "^3.3.0",
+    "ramda": "^0.29.0",
+    "tonal": "^5.0.0"
+  }
+}

@@ -1,9 +1,6 @@
-import {
-	parseMidiClipResponse,
-	redactSecrets,
-} from "../.generated/midi-core.mjs";
-import { captureReply } from "./copy-details.mjs";
+import { parseAgentResponse, redactSecrets } from "../.generated/midi-core.mjs";
 import { providerErrorDetails } from "./provider-error.mjs";
+import { captureReply } from "./response-diagnostics.mjs";
 
 export const MAX_CALLS = 30;
 const MAX_NOTE_PREVIEW = 128;
@@ -24,9 +21,17 @@ export function reportedUsage(usage) {
 
 function outputDetails(response) {
 	try {
-		const clip = parseMidiClipResponse(
-			response?.choices?.[0]?.message?.content,
-		);
+		const reply = parseAgentResponse(response?.choices?.[0]?.message?.content, {
+			finishReason: response?.choices?.[0]?.finish_reason,
+		});
+		const clip = reply.midi;
+		if (!clip)
+			return {
+				validation: reply.midiWarning
+					? "Invalid MIDI — output rejected"
+					: "Chat reply — no MIDI",
+				toolCount: reply.toolCount,
+			};
 		const pitches = clip.notes.map((note) => note.pitch);
 		return {
 			validation: "Valid MIDI",
@@ -94,6 +99,7 @@ export function observeChat(client, onEntry, nextId) {
 				const response = await client.chat(messages, options);
 				finish({
 					status: "Received",
+					responseId: safeText(response?.id),
 					model: safeText(response?.model),
 					finishReason: safeText(response?.choices?.[0]?.finish_reason),
 					usage: reportedUsage(response?.usage),

@@ -1,4 +1,7 @@
-import { redactSecrets } from "../.generated/midi-core.mjs";
+import {
+	redactSecrets,
+	supportsExactSource,
+} from "../.generated/midi-core.mjs";
 import { upsertCall } from "./call-log.mjs";
 import {
 	MAX_SOURCE_CLIPS,
@@ -19,7 +22,6 @@ export function createChatSession({
 		...initial,
 		busyId: null,
 		sendingId: null,
-		storageWarning: false,
 	};
 	const listeners = new Set();
 	let epoch = 0,
@@ -31,7 +33,7 @@ export function createChatSession({
 	const emit = (change) => {
 		if (disposed) return;
 		state = { ...state, ...change };
-		state.storageWarning = !save(state);
+		save(state);
 		for (const listener of listeners) listener();
 	};
 	const updateTurn = (id, change) =>
@@ -146,20 +148,26 @@ export function createChatSession({
 					historyStatus: true,
 					notes: source?.notes || [],
 					title: source?.title || "",
+					key: source?.key || null,
+					exactTransformUnsafe: items.some(
+						(item) => !supportsExactSource(item.source),
+					),
 					...(sources.length > 1
 						? { sourceClips: sources.map((item) => item.source) }
 						: {}),
 				});
 				if (!current()) return;
-				const { history, ...result } = next;
-				const clip = {
-					title: result.title,
-					explanation: result.explanation,
-					key: result.key,
-					duration: result.duration,
-					notes: result.notes,
-				};
-				updateTurn(id, { status: "complete", result: clip });
+				const { history, text = "", midiWarning = "", ...result } = next;
+				const clip = result.notes
+					? {
+							title: result.title,
+							explanation: result.explanation,
+							key: result.key,
+							duration: result.duration,
+							notes: result.notes,
+						}
+					: undefined;
+				updateTurn(id, { status: "complete", result: clip, text, midiWarning });
 				emit({ context: history || [] });
 			} catch (failure) {
 				if (current())

@@ -1,19 +1,32 @@
 import { useAuthActions, useAuthState } from "@pollinations/sdk/react";
-import { Alert, Button, Text } from "@pollinations/ui";
+import { Button } from "@pollinations/ui";
 import { AppUserMenu } from "@pollinations/ui/app-user-menu/sdk";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { authRequest, liveAuthCapability, pause } from "./live-auth.mjs";
 import { liveMessageHandler } from "./session.mjs";
 
-export function LiveAccount({ revision }: { revision: number }) {
+export function LiveAccount({
+	revision,
+	pending,
+	onPendingChange: setPending,
+	onError: setError,
+}: {
+	revision: number;
+	pending: boolean;
+	onPendingChange: (pending: boolean) => void;
+	onError: (error: string) => void;
+}) {
 	const { isLoggedIn, isHydrated } = useAuthState();
 	const { setApiKey, enterUrl } = useAuthActions();
-	const [pending, setPending] = useState(false);
-	const [error, setError] = useState("");
 	const active = useRef<AbortController | null>(null);
 	const canceling = useRef(false);
 	const capability = liveAuthCapability(window);
 	useEffect(() => () => active.current?.abort(), []);
+	useEffect(() => {
+		if (isLoggedIn) setError("");
+		else if (liveMessageHandler(window) && !capability)
+			setError("Press Retry on the Midi Journey device.");
+	}, [isLoggedIn, capability, setError]);
 
 	async function connect() {
 		if (active.current || !capability) return;
@@ -83,19 +96,24 @@ export function LiveAccount({ revision }: { revision: number }) {
 	return (
 		<div className="flex flex-col items-end gap-2">
 			{pending ? (
-				<>
-					<Text size="sm">Finish connecting in your browser.</Text>
-					<Button onClick={cancel}>Cancel</Button>
-				</>
+				<Button
+					size="sm"
+					className="mj-auth-cancel"
+					onClick={cancel}
+					aria-label="Cancel connection"
+				>
+					<span className="mj-auth-spinner" aria-hidden="true" />
+					Cancel
+				</Button>
 			) : (
-				<Button disabled={!isHydrated || !capability} onClick={connect}>
+				<Button
+					size="sm"
+					disabled={!isHydrated || !capability}
+					onClick={connect}
+				>
 					Connect
 				</Button>
 			)}
-			{!capability ? (
-				<Alert intent="warning">Press Retry on the MIDI Journey device.</Alert>
-			) : null}
-			{error ? <Alert intent="danger">{error}</Alert> : null}
 		</div>
 	);
 }

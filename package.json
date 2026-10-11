@@ -19,11 +19,12 @@
 		"test:ui": "npm run build:core && vite --config app/test/vite.config.mjs",
 		"verify": "npm test && node scripts/check-release-source.mjs",
 		"release:prepare": "node scripts/prepare-release.mjs",
-		"release:verify": "node scripts/verify-release.mjs"
+		"release:verify": "node scripts/verify-release.mjs",
+		"release:package": "node scripts/package-release.mjs"
 	},
 	"dependencies": {
 		"@pollinations/sdk": "5.1.0-alpha.7",
-		"@pollinations/ui": "file:vendor/pollinations-ui-0.1.0-alpha.1.tgz",
+		"@pollinations/ui": "0.1.0-alpha.11",
 		"react": "19.3.0",
 		"react-dom": "19.3.0",
 		"yaml": "2.9.0"
@@ -34,6 +35,7 @@
 		"@types/react": "19.3.0",
 		"@types/react-dom": "19.3.0",
 		"@vitejs/plugin-react": "6.1.1",
+		"acorn": "8.15.0",
 		"esbuild": "0.28.2",
 		"tailwindcss": "4.3.3",
 		"typescript": "7.0.2",

@@ -3,9 +3,8 @@ import test from "node:test";
 import { observeChat, upsertCall } from "../src/call-log.mjs";
 import {
 	captureReply,
-	copyDetails,
 	MAX_REPLY_CHARS,
-} from "../src/copy-details.mjs";
+} from "../src/response-diagnostics.mjs";
 import {
 	KEY_WIDTH,
 	pianoRoll,
@@ -81,7 +80,7 @@ test("piano roll gives ordinary phrases substantial notes without faint velociti
 	assert.ok(nearEnd.notes[0].x + nearEnd.notes[0].width <= ROLL_WIDTH);
 });
 
-test("copy retains the exact model message and all notes, with model/usage but no request or auth fields", async () => {
+test("diagnostics retain the exact provider message and usage but no request or auth fields", async () => {
 	const midi = { ...clip, notes: Array(180).fill(note) };
 	const raw = `\n${JSON.stringify(midi, null, 4)}\n`;
 	const response = {
@@ -104,27 +103,21 @@ test("copy retains the exact model message and all notes, with model/usage but n
 		}),
 		response,
 	);
-	const copied = copyDetails({ calls, result: midi });
-	const data = JSON.parse(copied);
-	assert.equal(data.calls[0].response.text, raw);
-	assert.equal(data.calls[0].response.status, "original");
-	assert.equal(data.calls[0].reportedModel, "served-model");
-	assert.equal(data.calls[0].tokens.total, 46);
-	assert.equal(data.midi.notes.length, 180);
-	assert.doesNotMatch(copied, /not-for-copy|apiKey/);
+	assert.equal(calls[0].reply.text, raw);
+	assert.equal(calls[0].reply.status, "original");
+	assert.equal(calls[0].model, "served-model");
+	assert.equal(calls[0].usage.total, 46);
+	assert.equal(midi.notes.length, 180);
+	assert.doesNotMatch(JSON.stringify(calls), /not-for-copy|apiKey/);
 	const saved = normalizeChat({
 		turns: [{ id: "x", prompt: "x", result: midi, calls }],
 	});
 	assert.equal(saved.turns[0].calls[0].reply.text, raw);
 });
 
-test("oversized replies and older replies are identified, not silently truncated or reconstructed", () => {
+test("oversized and absent replies are not silently truncated or reconstructed", () => {
 	assert.equal(captureReply("a".repeat(MAX_REPLY_CHARS + 1)).text, null);
-	const copied = JSON.parse(
-		copyDetails({ calls: [{ usage: {} }], result: clip }),
-	);
-	assert.equal(copied.calls[0].response.text, null);
-	assert.match(copied.calls[0].response.status, /older reply/);
+	assert.deepEqual(captureReply(undefined), { text: null, status: "not retained" });
 	assert.equal(
 		captureReply("\nnot valid MIDI JSON\n").text,
 		"\nnot valid MIDI JSON\n",

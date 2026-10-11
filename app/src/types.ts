@@ -6,6 +6,7 @@ export type Note = {
 };
 export type CallEntry = {
 	id: number;
+	responseId?: string | null;
 	startedAt: string;
 	requestedModel: string | null;
 	model: string | null;
@@ -55,6 +56,8 @@ export type ChatTurn = {
 	prompt: string;
 	status: "pending" | "complete" | "failed" | "canceled";
 	result?: MidiResult;
+	text?: string;
+	midiWarning?: string;
 	calls: CallEntry[];
 	basedOn?: string;
 	sourceTarget?: string;
@@ -80,7 +83,6 @@ export type ChatState = {
 	context: HistoryEntry[];
 	busyId: string | null;
 	sendingId: string | null;
-	storageWarning: boolean;
 };
 export type LiveContext = {
 	connected: boolean;

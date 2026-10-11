@@ -10,16 +10,15 @@ import {
 	Surface,
 	Text,
 	Textarea,
+	Tooltip,
 } from "@pollinations/ui";
+import { Markdown } from "@pollinations/ui/markdown";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { MessageMidiInput, MidiInputFeedback } from "./MidiInputFeedback";
 import { midiInputsFeedback } from "./midi-input.mjs";
 import { PianoRoll } from "./PianoRoll";
 import { ReplyFooter } from "./ReplyFooter";
-import {
-	clipCreationUnavailable,
-	replyPresentation,
-} from "./reply-presentation.mjs";
+import { clipCreationUnavailable } from "./reply-presentation.mjs";
 import type { ChatState, LiveContext, MidiAttachment } from "./types";
 
 type Props = {
@@ -28,6 +27,7 @@ type Props = {
 	chat: ChatState;
 	live: LiveContext;
 	loggedIn: boolean;
+	connecting?: boolean;
 	onPrompt: (text: string) => void;
 	onGenerate: () => void;
 	onCancel: () => void;
@@ -40,6 +40,7 @@ export function Workspace({
 	chat,
 	live,
 	loggedIn,
+	connecting = false,
 	onPrompt,
 	onGenerate,
 	onCancel,
@@ -71,10 +72,33 @@ export function Workspace({
 		last?.writeError,
 	]);
 	function submit() {
-		if (input.error || input.checking) return;
+		if (
+			!loggedIn ||
+			!chat.draft.trim() ||
+			chat.busyId ||
+			chat.sendingId ||
+			input.error ||
+			input.checking
+		)
+			return;
 		follow.current = true;
 		onGenerate();
 	}
+	const sendButton = (
+		<Button
+			size="md"
+			type="submit"
+			aria-label="Send"
+			className="mj-send"
+			disabled={
+				!loggedIn ||
+				!chat.draft.trim() ||
+				Boolean(chat.sendingId || input.error || input.checking)
+			}
+		>
+			<ArrowRightIcon aria-hidden="true" className="h-5 w-5" />
+		</Button>
+	);
 	function fresh() {
 		follow.current = true;
 		onNewChat();
@@ -82,7 +106,7 @@ export function Workspace({
 	}
 	return (
 		<>
-			<header className="mj-app-width mj-header mx-auto z-30 flex w-full shrink-0 items-center justify-between gap-2 px-4 py-2">
+			<header className="mj-app-width mj-header mx-auto z-30 flex w-full shrink-0 items-center justify-between gap-2 px-5 py-3">
 				<Button
 					size="sm"
 					type="button"
@@ -98,10 +122,7 @@ export function Workspace({
 					<ColorModeToggle />
 				</div>
 			</header>
-			{notice ? (
-				<div className="mj-app-width mx-auto mb-2 w-full px-4">{notice}</div>
-			) : null}
-			<main className="mj-app-width mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col px-4 pb-3">
+			<main className="mj-app-width mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col">
 				<Surface
 					role="region"
 					variant="panel"
@@ -121,110 +142,114 @@ export function Workspace({
 								el.scrollHeight - el.scrollTop - el.clientHeight < 80;
 						}}
 					>
-						{!chat.turns.length ? (
-							<Surface
-								variant="panel"
-								className="mj-assistant-reply mr-6 p-3 space-y-2"
-								aria-label="Welcome from MIDI Journey"
+						{/* Always the first bubble, including after the first exchange. */}
+						<Surface
+							variant="card"
+							className="mj-assistant-reply mr-6 p-3 space-y-2"
+							aria-label="Welcome from Midi Journey 2"
+						>
+							<Text size="sm">🎹 Hi, I’m Midi Journey 2.</Text>
+							<ul className="list-disc space-y-1 pl-4">
+								<li>
+									<Text size="sm">
+										<strong>Describe</strong> an idea, then ask for changes.
+									</Text>
+								</li>
+								<li>
+									<Text size="sm">
+										<strong>Select a Live clip</strong> to use its MIDI as
+										input.
+									</Text>
+								</li>
+								<li>
+									<Text size="sm">
+										<strong>Create clip</strong> fills an empty slot or replaces
+										the selected clip.
+									</Text>
+								</li>
+							</ul>
+						</Surface>
+
+						{chat.turns.map((turn, index) => (
+							<article
+								key={turn.id}
+								aria-label={`Exchange ${index + 1}`}
+								className="space-y-2"
 							>
-								<Text size="sm">🎹 Hi, I’m MIDI Journey.</Text>
-								<ul className="list-disc space-y-1 pl-4">
-									<li>
-										<Text size="sm">
-											<strong>Describe</strong> an idea, then ask for changes.
-										</Text>
-									</li>
-									<li>
-										<Text size="sm">
-											<strong>Select a Live clip</strong> to use its MIDI as
-											input.
-										</Text>
-									</li>
-									<li>
-										<Text size="sm">
-											<strong>Create clip</strong> fills an empty slot or
-											replaces the selected clip.
-										</Text>
-									</li>
-								</ul>
-							</Surface>
-						) : (
-							chat.turns.map((turn, index) => (
-								<article
-									key={turn.id}
-									aria-label={`Exchange ${index + 1}`}
-									className="space-y-2"
+								<Surface
+									variant="card-themed"
+									className="mj-user-message polli:bg-theme-bg-active polli:text-theme-text-strong ml-auto w-fit max-w-[88%] px-3 py-2"
+									aria-label="Your message"
 								>
-									<Surface
-										variant="card"
-										className="mj-user-message ml-auto w-fit max-w-[88%] px-3 py-2"
-										aria-label="Your message"
-									>
-										{turn.inputs?.length ||
-										(turn.input?.kind && turn.input.kind !== "none") ? (
-											<MessageMidiInput
-												inputs={turn.inputs || (turn.input ? [turn.input] : [])}
-											/>
-										) : null}
-										<Text size="sm" className="whitespace-pre-wrap break-words">
-											{turn.prompt}
+									{turn.inputs?.length ||
+									(turn.input?.kind && turn.input.kind !== "none") ? (
+										<MessageMidiInput
+											inputs={turn.inputs || (turn.input ? [turn.input] : [])}
+										/>
+									) : null}
+									<Text size="sm" className="whitespace-pre-wrap break-words">
+										{turn.prompt}
+									</Text>
+								</Surface>
+								<Surface
+									variant="card"
+									className="mj-assistant-reply mr-6 p-3 space-y-2"
+									aria-label="Assistant reply"
+								>
+									{turn.status === "pending" ? (
+										<Text
+											size="sm"
+											role="status"
+											className="flex items-center gap-2"
+										>
+											<span className="mj-thinking-dots" aria-hidden="true">
+												<span />
+												<span />
+												<span />
+											</span>
+											Thinking…
 										</Text>
-									</Surface>
-									<Surface
-										variant="panel"
-										className="mj-assistant-reply mr-6 p-3 space-y-2"
-										aria-label="Assistant reply"
-									>
-										{turn.status === "pending" ? (
+									) : null}
+									{turn.error ? (
+										<Alert
+											intent={turn.status === "canceled" ? "warning" : "danger"}
+										>
+											{turn.error}
+										</Alert>
+									) : null}
+									{turn.text ? (
+										<Markdown className="mj-chat-text">{turn.text}</Markdown>
+									) : null}
+									{turn.midiWarning ? (
+										<Alert intent="warning">{turn.midiWarning}</Alert>
+									) : null}
+									{turn.result ? (
+										<>
+											<Heading size="card" className="mj-reply-title">
+												{turn.result.title}
+											</Heading>
 											<Text
 												size="sm"
-												role="status"
-												className="flex items-center gap-2"
+												className="mj-reply-explanation whitespace-pre-wrap break-words"
 											>
-												<span className="mj-thinking-dots" aria-hidden="true">
-													<span />
-													<span />
-													<span />
-												</span>
-												Creating your musical idea…
+												{turn.result.explanation}
 											</Text>
-										) : null}
-										{turn.error ? (
-											<Alert
-												intent={
-													turn.status === "canceled" ? "warning" : "danger"
-												}
-											>
-												{turn.error}
-											</Alert>
-										) : null}
-										{turn.result ? (
-											<>
-												<Heading size="card" className="mj-reply-title">
-													{turn.result.title}
-												</Heading>
-												<Text
-													size="sm"
-													className="mj-reply-explanation whitespace-pre-wrap break-words"
-												>
-													{replyPresentation(turn).explanation}
-												</Text>
-												<PianoRoll clip={turn.result} />
-											</>
-										) : null}
-										<ReplyFooter
-											turn={turn}
-											replyNumber={index + 1}
-											sending={chat.sendingId === turn.id}
-											unavailableReason={creationUnavailable}
-											disabled={Boolean(chat.busyId || chat.sendingId)}
-											onSend={() => onSend(turn.id)}
-										/>
-									</Surface>
-								</article>
-							))
-						)}
+											<PianoRoll clip={turn.result} />
+										</>
+									) : null}
+									<ReplyFooter
+										turn={turn}
+										replyNumber={index + 1}
+										sending={chat.sendingId === turn.id}
+										unavailableReason={creationUnavailable}
+										disabled={Boolean(chat.busyId || chat.sendingId)}
+										onSend={() => onSend(turn.id)}
+									/>
+								</Surface>
+							</article>
+						))}
 					</ScrollArea>
+
 					<form
 						className="shrink-0 space-y-2"
 						onSubmit={(event) => {
@@ -232,6 +257,11 @@ export function Workspace({
 							submit();
 						}}
 					>
+						{notice ? (
+							<div className="mj-app-width w-full shrink-0" role="alert">
+								{notice}
+							</div>
+						) : null}
 						<Field.Root className="mj-composer flex min-w-0 flex-col">
 							<MidiInputFeedback {...input} />
 							<Field.Label htmlFor="chat-message" className="sr-only">
@@ -271,35 +301,25 @@ export function Workspace({
 									<Button size="md" type="button" onClick={onCancel}>
 										Cancel
 									</Button>
-								) : (
-									<Button
-										size="md"
-										type="submit"
-										aria-label="Send"
-										className="mj-send"
-										disabled={
-											!loggedIn ||
-											!chat.draft.trim() ||
-											Boolean(chat.sendingId || input.error || input.checking)
+								) : !loggedIn ? (
+									<Tooltip
+										triggerAs="span"
+										tapEnabled
+										ariaLabel="Why Send is unavailable"
+										content={
+											connecting
+												? "Finish connecting in your browser."
+												: "Connect to Pollinations first."
 										}
 									>
-										<ArrowRightIcon aria-hidden="true" className="h-5 w-5" />
-									</Button>
+										{sendButton}
+									</Tooltip>
+								) : (
+									sendButton
 								)}
 							</div>
 						</Field.Root>
-						{!loggedIn ? (
-							<Text size="xs" tone="muted">
-								Connect to Pollinations above to send a message.
-							</Text>
-						) : null}
 					</form>
-					{chat.storageWarning ? (
-						<Text size="xs" role="status">
-							This chat could not be saved locally. Keep the window open to
-							retain it.
-						</Text>
-					) : null}
 				</Surface>
 			</main>
 		</>

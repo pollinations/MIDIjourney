@@ -28,7 +28,11 @@ export default {
 		port: 5186,
 		strictPort: true,
 		fs: {
-			allow: [root, resolve(root, "../node_modules/@pollinations/ui/dist")],
+			allow: [
+				root,
+				resolve(root, "../node_modules/@pollinations/ui/dist"),
+				resolve(root, "../core/test/fixtures/managed-agent-replies.json"),
+			],
 		},
 	},
 };

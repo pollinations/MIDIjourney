@@ -7,13 +7,23 @@ export function isJweb(host) {
 		typeof host?.max?.bindInlet === "function"
 	);
 }
+// Publish only a boolean; no account identity, balance or key reaches Max.
+export function reportPollinationsConnection(host, connected) {
+	if (!isJweb(host)) return () => {};
+	const send = () =>
+		host.max.outlet("pollinations", connected === true ? 1 : 0);
+	send();
+	// Reassert after native initialization, without an HTTP request.
+	const timer = setInterval(send, 2000);
+	return () => clearInterval(timer);
+}
 export function bridge(host) {
 	if (!isJweb(host)) throw new Error("Open MIDI Journey from its Live device.");
 	if (bridges.has(host)) return bridges.get(host);
 	const pending = new Map();
 	let sequence = 0;
 	const prefix = Math.random().toString(36).slice(2);
-	host.max.bindInlet("response", (id, raw) => {
+	const receive = (id, raw) => {
 		const waiting = pending.get(String(id));
 		if (!waiting) return;
 		pending.delete(String(id));
@@ -31,7 +41,35 @@ export function bridge(host) {
 		} catch (failure) {
 			waiting.reject(failure);
 		}
+	};
+	host.max.bindInlet("responsepart", (id, index, total, text) => {
+		const waiting = pending.get(String(id));
+		if (!waiting) return;
+		const parts = waiting.parts || (waiting.parts = []);
+		if (
+			!Number.isInteger(total) ||
+			total < 1 ||
+			total > 2048 ||
+			index !== parts.length ||
+			(waiting.total && waiting.total !== total) ||
+			typeof text !== "string" ||
+			text.length > 4096 ||
+			index >= total
+		) {
+			receive(
+				id,
+				JSON.stringify({
+					ok: false,
+					error: "The MIDI transfer was incomplete. Select the clip again.",
+				}),
+			);
+			return;
+		}
+		waiting.total = total;
+		parts.push(text);
+		if (parts.length === total) receive(id, parts.join(""));
 	});
+	host.max.bindInlet("response", receive);
 	const request = (action, ...args) =>
 		new Promise((resolve, reject) => {
 			const id = `${prefix}-${++sequence}`;
@@ -55,7 +93,23 @@ export function bridge(host) {
 			);
 			pending.set(id, { resolve, reject, timer });
 			try {
-				host.max.outlet(action, id, ...args);
+				if (action === "create" && args[0].length > 4096) {
+					const raw = args[0].replace(
+						/[\u007f-\uffff]/g,
+						(c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+					);
+					if (raw.length > 1000000)
+						throw new Error("The MIDI clip is too large to transfer.");
+					const total = Math.ceil(raw.length / 4096);
+					for (let index = 0; index < total; index++)
+						host.max.outlet(
+							"createpart",
+							id,
+							index,
+							total,
+							raw.slice(index * 4096, (index + 1) * 4096),
+						);
+				} else host.max.outlet(action, id, ...args);
 			} catch (failure) {
 				clearTimeout(timer);
 				pending.delete(id);

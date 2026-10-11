@@ -73,7 +73,7 @@ test("log reports provider model, token counts and validated output without reco
 	);
 });
 
-test("unknown usage/model remain unknown; invalid MIDI is rejected but the reply is available for explicit copy", async () => {
+test("unknown usage/model remain unknown and plain text is classified as a chat reply", async () => {
 	assert.deepEqual(
 		reportedUsage({
 			prompt_tokens: 0,
@@ -90,15 +90,15 @@ test("unknown usage/model remain unknown; invalid MIDI is rejected but the reply
 	await log.observed.chat([], { model: "not-the-actual-model" });
 	assert.equal(log.rows()[0].model, null);
 	assert.equal(log.rows()[0].usage.total, null);
-	assert.equal(
-		log.rows()[0].output.validation,
-		"Invalid MIDI — output rejected",
-	);
-  assert.deepEqual(log.rows()[0].reply, { text: "private malformed text", status: "original" });
-  assert.equal(log.rows()[0].output.noteCount, undefined);
+	assert.equal(log.rows()[0].output.validation, "Chat reply — no MIDI");
+	assert.deepEqual(log.rows()[0].reply, {
+		text: "private malformed text",
+		status: "original",
+	});
+	assert.equal(log.rows()[0].output.noteCount, undefined);
 });
 
-test("every retry attempt has its own entry and original SDK errors retain their identity", async () => {
+test("only explicit retries add another log entry and original SDK errors retain their identity", async () => {
 	let attempt = 0;
 	const failure = new PollinationsError(
 		"Private response body",
@@ -114,6 +114,12 @@ test("every retry attempt has its own entry and original SDK errors retain their
 	const midi = new PollinationsMidiClient({
 		auth: { requireClient: () => log.observed },
 	});
+	await assert.rejects(midi.generate({ promptText: "A test", duration: 8 }), {
+		code: "PROVIDER_UNAVAILABLE",
+	});
+	assert.equal(attempt, 1);
+	assert.equal(log.rows().length, 1);
+	// A second user action may retry; the app never does it automatically.
 	await midi.generate({ promptText: "A test", duration: 8 });
 	assert.deepEqual(
 		log.rows().map((row) => row.status),

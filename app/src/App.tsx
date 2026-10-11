@@ -15,14 +15,14 @@ import {
 } from "../.generated/midi-core.mjs";
 import { observeChat } from "./call-log.mjs";
 import { createChatSession } from "./chat-session.mjs";
-import { currentContext, isJweb, subscribeContext } from "./jweb.mjs";
-import { LiveAccount } from "./LiveAccount";
 import {
-	browserStorage,
-	loadChat,
-	saveChat,
-	sendClipToLive,
-} from "./session.mjs";
+	currentContext,
+	isJweb,
+	reportPollinationsConnection,
+	subscribeContext,
+} from "./jweb.mjs";
+import { LiveAccount } from "./LiveAccount";
+import { freshChat, sendClipToLive } from "./session.mjs";
 import type { CallEntry, ChatState, LiveContext } from "./types";
 import { Workspace } from "./Workspace";
 
@@ -30,18 +30,22 @@ export function App() {
 	const { apiKey, isLoggedIn, error: authError } = useAuthState();
 	const { logout } = useAuthActions();
 	const callId = useRef(0);
+	const [connecting, setConnecting] = useState(false);
+	const [connectionError, setConnectionError] = useState("");
 	const [live, setLive] = useState<LiveContext>({
 		connected: false,
 		checking: true,
 	});
 	const session = useMemo(() => {
-		const storage = browserStorage();
 		const client = apiKey
-			? new Pollinations({ apiKey, textTimeout: CONFIG.textTimeoutMs })
+			? new Pollinations({
+					apiKey,
+					baseUrl: CONFIG.agentBaseUrl,
+					textTimeout: CONFIG.textTimeoutMs,
+				})
 			: null;
 		return createChatSession({
-			initial: loadChat(storage),
-			save: (value: ChatState) => saveChat(storage, value),
+			initial: freshChat(),
 			readContext: async () => {
 				try {
 					return await currentContext(window, true);
@@ -71,6 +75,10 @@ export function App() {
 		return () => session.dispose();
 	}, [session]);
 	useEffect(() => subscribeContext(window, setLive), []);
+	useEffect(
+		() => reportPollinationsConnection(window, isLoggedIn && Boolean(apiKey)),
+		[isLoggedIn, apiKey],
+	);
 	useEffect(() => {
 		if (!isJweb(window)) return;
 		const openExternal = (event: MouseEvent) => {
@@ -90,24 +98,30 @@ export function App() {
 	return (
 		<div
 			data-theme="blue"
-			className="flex h-dvh flex-col bg-app-bg text-sm text-theme-text-base"
+			className="mj-app flex h-dvh flex-col text-sm text-theme-text-base"
 		>
 			<Workspace
 				account={
 					<LiveAccount
+						pending={connecting}
+						onPendingChange={setConnecting}
+						onError={setConnectionError}
 						revision={
 							chat.turns.filter((turn) => turn.status === "complete").length
 						}
 					/>
 				}
 				notice={
-					authError ? (
-						<Alert intent="danger">{redactSecrets(authError.message)}</Alert>
+					connectionError || authError ? (
+						<Alert intent="danger">
+							{redactSecrets(connectionError || authError?.message || "")}
+						</Alert>
 					) : null
 				}
 				chat={chat}
 				live={live}
 				loggedIn={isLoggedIn}
+				connecting={connecting}
 				onPrompt={session.setDraft}
 				onGenerate={() => void session.generate()}
 				onCancel={session.cancel}

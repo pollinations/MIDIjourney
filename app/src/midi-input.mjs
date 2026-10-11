@@ -18,6 +18,10 @@ export function snapshotMidiInput(key, source, summary) {
 		summary,
 		source: {
 			title: summary.title,
+			key:
+				typeof source.key === "string"
+					? redactSecrets(source.key).slice(0, 40)
+					: null,
 			duration:
 				Number.isFinite(source.duration) &&
 				source.duration > 0 &&

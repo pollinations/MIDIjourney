@@ -3,8 +3,18 @@
 import { PolliProvider } from "@pollinations/sdk/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import managedReplies from "../../core/test/fixtures/managed-agent-replies.json";
 import { App } from "../src/App";
 import "../src/style.css";
+
+const signedOut =
+	new URLSearchParams(location.search).get("auth") === "signed-out";
+if (signedOut)
+	history.replaceState(
+		null,
+		"",
+		`${location.pathname}${location.search}#live-session=${"a".repeat(64)}`,
+	);
 
 function requiredElement(id: string) {
 	const element = document.getElementById(id);
@@ -37,7 +47,29 @@ host.max = {
 							connected: true,
 							target: `track-${destination}`,
 							destination: `MIDI ${destination} · empty slot 1`,
-							source: null,
+							source: (
+								document.getElementById("test-source") as HTMLInputElement
+							)?.checked
+								? {
+										title: "Selected melody",
+										key: "E minor",
+										duration: 8,
+										notes: [
+											{
+												pitch: 64,
+												start_time: 0.125,
+												duration: 1.375,
+												velocity: 87,
+											},
+											{
+												pitch: 71,
+												start_time: 2.875,
+												duration: 2.125,
+												velocity: 64,
+											},
+										],
+									}
+								: null,
 						},
 					}),
 				),
@@ -77,6 +109,18 @@ window.fetch = async (input, options) => {
 				: input.url,
 		location.href,
 	);
+	if (
+		signedOut &&
+		url.origin === location.origin &&
+		url.pathname.startsWith("/api/auth/")
+	)
+		return Response.json({
+			status:
+				url.pathname.endsWith("/status") &&
+				new URLSearchParams(location.search).get("auth-error") === "timeout"
+					? "expired"
+					: "pending",
+		});
 	if (url.origin === location.origin) return originalFetch(input, options);
 	let payload: unknown;
 	if (url.origin === "https://enter.pollinations.ai")
@@ -135,27 +179,53 @@ window.fetch = async (input, options) => {
 				},
 			],
 		};
+		const mode = (document.getElementById("test-response") as HTMLSelectElement)
+			.value;
+		const reply = (payload as { choices: { message: { content: string } }[] })
+			.choices[0].message;
+		if (mode === "text")
+			reply.content =
+				"## Syncopation\n\n- **Accent** the offbeat.\n- Leave a little space.\n\nNo MIDI is needed for this explanation.";
+		if (mode === "claude")
+			reply.content = managedReplies["current-claude"].content;
+		if (mode === "image") reply.content = managedReplies["agent-image"].content;
+		if (mode === "error")
+			reply.content = managedReplies["agent-claude"].content;
+		if (mode === "invalid")
+			reply.content =
+				"The musical idea is still readable.\n\n```json\n" +
+				JSON.stringify({
+					title: "Invalid",
+					duration: 4,
+					notes: [{ pitch: 200, start_time: 0, duration: 1, velocity: 80 }],
+				}) +
+				"\n```";
 	} else throw new Error("Unexpected external request in test fixture");
 	return new Response(JSON.stringify(payload), {
 		headers: { "Content-Type": "application/json" },
 	});
 };
-if (!localStorage.getItem("fixture-seeded")) {
-	localStorage.setItem(
-		"midijourney:persistent-workspace:v1",
-		JSON.stringify({ prompt: "Legacy prompt must not appear", history: [] }),
-	);
-	localStorage.setItem("fixture-seeded", "yes");
-}
 const storage = {
 	getItem: (key: string) =>
-		key.endsWith(":token") ? "not-a-real-user-key" : null,
+		!signedOut && key.endsWith(":token") ? "not-a-real-user-key" : null,
 	setItem: () => {},
 	removeItem: () => {},
 };
 createRoot(requiredElement("root")).render(
 	<StrictMode>
 		<section style={{ fontSize: 11, height: 44 }} aria-label="Test controls">
+			<select
+				id="test-response"
+				aria-label="Test response format"
+				defaultValue="midi"
+			>
+				<option value="midi">MIDI</option>
+				<option value="text">Text</option>
+				<option value="claude">Claude tool trace</option>
+				<option value="image">Image</option>
+				<option value="error">Tool error</option>
+				<option value="invalid">Invalid MIDI</option>
+			</select>{" "}
 			<button
 				type="button"
 				onClick={() => {
@@ -164,6 +234,9 @@ createRoot(requiredElement("root")).render(
 			>
 				Switch MIDI target
 			</button>{" "}
+			<label>
+				<input id="test-source" type="checkbox" /> Selected MIDI
+			</label>{" "}
 			<label>
 				<input id="test-delay" type="checkbox" />
 				Delay reply

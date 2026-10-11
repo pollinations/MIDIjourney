@@ -1,0 +1,9 @@
+{
+	"overrides": [
+		{
+			"includes": ["device/bridge.js", "device/window.js", "device/panel.js"],
+			"linter": { "enabled": false },
+			"javascript": { "formatter": { "trailingCommas": "none" } }
+		}
+	]
+}

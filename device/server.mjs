@@ -6,7 +6,8 @@ let server;
 let starting;
 let liveContext = { connected: false };
 function start() {
-  if (server) { max.outlet("uiurl", server.editorUrl); return; }
+  // Opening an already-running editor must not reload its page/erase its chat.
+  if (server) return;
   if (starting) return starting;
   starting = (async () => {
     try {
@@ -15,7 +16,7 @@ function start() {
       max.outlet("panel", "ready");
     } catch {
       max.outlet("panel", "unavailable");
-      max.post("MIDI Journey: close another MIDI Journey device or preview using port 5178, then press Retry.", max.POST_LEVELS.ERROR);
+      max.post("Midi Journey 2: close another Midi Journey 2 device or preview using port 5178, then click the device image to retry.", max.POST_LEVELS.ERROR);
     }
   })().finally(() => { starting = undefined; });
   return starting;

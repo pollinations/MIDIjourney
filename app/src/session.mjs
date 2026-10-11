@@ -4,27 +4,19 @@ import {
 	parseMidiClipResponse,
 	redactSecrets,
 } from "../.generated/midi-core.mjs";
-import { captureReply } from "./copy-details.mjs";
 import { createClip, isJweb } from "./jweb.mjs";
 import { MAX_SOURCE_CLIPS, normalizeMidiInput } from "./midi-input.mjs";
 import { providerErrorDetails } from "./provider-error.mjs";
-export const SESSION_KEY = "midijourney:persistent-chat:v1";
-export const LEGACY_KEY = "midijourney:persistent-workspace:v1";
-const MAX_BYTES = 3_000_000;
+import { captureReply } from "./response-diagnostics.mjs";
+
 const text = (value, limit = 1000) =>
 	typeof value === "string" ? redactSecrets(value).slice(0, limit) : "";
 const count = (value) =>
 	Number.isSafeInteger(value) && value >= 0 ? value : null;
-export function browserStorage() {
-	try {
-		return window.localStorage;
-	} catch {
-		return null;
-	}
-}
 function normalizeCall(call) {
 	return {
 		id: count(call?.id) ?? 0,
+		...(call?.responseId ? { responseId: text(call.responseId, 160) } : {}),
 		startedAt: text(call?.startedAt, 40),
 		requestedModel: text(call?.requestedModel, 160) || null,
 		model: text(call?.model, 160) || null,
@@ -82,8 +74,6 @@ export function normalizeChat(value) {
 						explanation: text(raw.result.explanation, 1000),
 					}),
 				);
-				// The validated provider explanation can have an appended model label.
-				result.explanation = text(raw.result.explanation, 1200);
 				result.title = text(result.title, CONFIG.maxTitleLength);
 				result.key = text(result.key, 40) || null;
 			}
@@ -93,12 +83,18 @@ export function normalizeChat(value) {
 		turns.push({
 			id: text(raw.id, 80) || `restored-${index}`,
 			prompt: text(raw.prompt, CONFIG.maxPromptLength),
-			status: result ? "complete" : "failed",
+			status:
+				result || (raw.status === "complete" && (raw.text || raw.midiWarning))
+					? "complete"
+					: "failed",
 			result,
-			error: result
-				? ""
-				: text(raw.error) ||
-					"This generation was interrupted. Send your message again.",
+			text: text(raw.text, 64000),
+			midiWarning: text(raw.midiWarning),
+			error:
+				result || (raw.status === "complete" && (raw.text || raw.midiWarning))
+					? ""
+					: text(raw.error) ||
+						"This generation was interrupted. Send your message again.",
 			basedOn: text(raw.basedOn, 240),
 			sourceTarget: text(raw.sourceTarget, 120),
 			input: normalizeMidiInput(raw.input),
@@ -121,33 +117,8 @@ export function normalizeChat(value) {
 		context: normalizeHistory(value?.context),
 	};
 }
-export function loadChat(storage) {
-	try {
-		// Approved fresh start: only this prototype's old drawer, never SDK login,
-		// theme storage, or the other versions' conversations.
-		storage?.removeItem(LEGACY_KEY);
-		const raw = storage?.getItem(SESSION_KEY);
-		return normalizeChat(
-			raw && raw.length <= MAX_BYTES ? JSON.parse(raw) : null,
-		);
-	} catch {
-		return normalizeChat(null);
-	}
-}
-export function saveChat(storage, value) {
-	try {
-		const bounded = normalizeChat(value);
-		let serialized = JSON.stringify(bounded);
-		while (serialized.length > MAX_BYTES && bounded.turns.length > 1) {
-			bounded.turns.shift();
-			serialized = JSON.stringify(bounded);
-		}
-		if (serialized.length > MAX_BYTES || !storage) return false;
-		storage.setItem(SESSION_KEY, serialized);
-		return true;
-	} catch {
-		return false;
-	}
+export function freshChat() {
+	return { draft: "", turns: [], context: [] };
 }
 export function liveMessageHandler(host) {
 	return isJweb(host) ? (message) => host.max.outlet(message) : null;

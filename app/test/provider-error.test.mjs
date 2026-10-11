@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { observeChat } from "../src/call-log.mjs";
-import { copyDetails } from "../src/copy-details.mjs";
 import { providerErrorDetails } from "../src/provider-error.mjs";
 import { normalizeChat } from "../src/session.mjs";
 
@@ -65,7 +64,7 @@ test("provider diagnostic retention is bounded and does not stringify arbitrary 
 	);
 });
 
-test("a real rejected SDK attempt remains inspectable after saving/restoring the chat", async () => {
+test("a rejected SDK attempt retains diagnostic details after chat normalization", async () => {
 	const failure = Object.assign(new Error("Unknown agent endpoint"), {
 		code: "MODEL_NOT_FOUND",
 		status: 404,
@@ -83,19 +82,18 @@ test("a real rejected SDK attempt remains inspectable after saving/restoring the
 	);
 	await assert.rejects(
 		observed.chat([{ role: "user", content: "private prompt" }], {
-			model: "community/pollinations-router/midijourney",
+			model: "community/pollinations-ai/midijourney",
 		}),
 		(error) => error === failure,
 	);
 	const restored = normalizeChat({
 		turns: [{ prompt: "private prompt", calls: [calls.at(-1)] }],
 	}).turns[0];
-	const details = JSON.parse(copyDetails(restored));
-	assert.deepEqual(details.calls[0].error, {
+	assert.deepEqual(restored.calls[0].error, {
 		code: "MODEL_NOT_FOUND",
 		httpStatus: 404,
 		requestId: "request-123",
 		message: "Unknown agent endpoint",
 	});
-	assert.doesNotMatch(JSON.stringify(details), /private prompt/);
+	assert.doesNotMatch(JSON.stringify(restored.calls), /private prompt/);
 });

@@ -1,19 +1,15 @@
 # Changelog
 
-## Unreleased — V3
+## Midi Journey 2 — 3.0.0 (unreleased)
 
-- Replaced the all-Max editor with a compact, resizable persistent web conversation using the shared Pollinations UI and SDK.
-- Added shared light/dark mode and account menu, system-browser login handoff, balance and dashboard access.
-- Added chat context, New chat, automatic single-clip input badges and velocity-shaded piano-roll previews.
-- Kept original MIDI sanitization and request semantics; added regression fixtures for parity.
-- Creates clips in empty Session slots or replaces the selected existing clip in place; validates MIDI and checks native note read-back.
-- Uses the managed MIDI Journey agent through the SDK, accepting native YAML/CSV and valid JSON without structured-output options or model fallbacks.
-- Simplified the header and response cards, with a round Send icon inside the full-width composer. Copy/Paste uses the native right-click menu.
-- Simplified the Main-track device to title, Open, status and Retry on error; retained stereo pass-through.
-- Consolidated production source into app/core/device with one root lockfile/build.
-- Embedded web assets and fonts in the Node runtime; added isolated native-freeze staging and exact-byte verification.
-- Preserved old UI and Ableton Extensions experiments on codex/archive-ui-experiments. The experimental dev-mj2 branch is unchanged.
-- Removed old History drawer, model selector and redundant Max UI from the active product.
-- Removed retired artwork, unused clipboard transport and obsolete Max-era helpers from the V3 source tree.
+- Persistent, resizable chat using the shared Pollinations UI and SDK, light/dark modes and system-browser login.
+- Chat-first MIDI Journey agent: Markdown/media replies alongside strictly validated YAML/CSV or JSON MIDI; tool transcripts never become clips.
+- Free local welcome and exact single-clip transpositions; one SDK request per other message with no automatic paid retries.
+- Keeps the existing hosted D1 prompt agent and its Pollinations MCP tools; no replacement code agent is required.
+- Selected MIDI input, velocity-shaded piano-roll preview, and creation or in-place replacement of Session clips with native read-back checks.
+- Compact composer and header, connection guidance on disabled Send, and native right-click Copy/Paste.
+- Four-state OPEN/CLOSE device artwork with sign-in indication and transparent stereo pass-through.
+- Fresh memory-only chat on each device load; hiding/reopening keeps the current conversation.
+- Self-contained web assets, fonts and artwork; isolated native-freeze staging and exact-byte verification.
 
-The V3 tag and downloadable frozen device remain gated on native acceptance.
+Local acceptance completed; remaining manual checks confirmed by the maintainer on October 11, 2026. Publication is pending approval.

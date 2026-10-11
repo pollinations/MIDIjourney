@@ -6,7 +6,7 @@ function MidiBadge({ summary }: { summary: MidiInputSummary }) {
 		<Surface variant="card" className="mj-midi-badge">
 			<AudioIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
 			<Text as="span" size="xs" weight="medium" className="min-w-0 truncate">
-				{summary.title || "Untitled MIDI clip"}
+				{`${(summary.title || "Untitled MIDI clip").replace(/\.midi?$/i, "")}.midi`}
 			</Text>
 		</Surface>
 	);

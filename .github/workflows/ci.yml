@@ -1,4 +1,4 @@
-name: Verify V3
+name: Verify Midi Journey 2
 
 on: [push, pull_request]
 

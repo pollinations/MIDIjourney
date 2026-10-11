@@ -1,76 +1,101 @@
-# MIDI Journey
+# Midi Journey 2
 
-A persistent musical conversation for Ableton Live. Describe an idea, refine it with a selected MIDI clip, preview the notes, then create or replace a clip without closing the editor.
+Compose MIDI through conversation, bring a selected clip into the chat, and turn
+ideas into clips in Ableton Live. Midi Journey 2 adds a piano-roll preview,
+light/dark themes, browser sign-in, and a self-contained Max for Live device.
 
-**V3 is being prepared for release.** Source builds are not frozen release devices. The [release checklist](docs/RELEASE_CHECKLIST.md) records the remaining native acceptance gates. Download only an explicitly published V3 asset when it becomes available; the older V2 release is a different product.
+**Coming soon — the new download is not published yet.** Local acceptance is
+complete, including the remaining checks confirmed by the maintainer on
+October 11, 2026.
 
-## The workflow
+## Downloads
 
-1. Put **one MIDI Journey device on Main**. It is a transparent Max Audio Effect, not an instrument: Max connects to MIDI tracks through Live's Object Model.
-2. Press **Open**. The resizable web window stays open while you change the selection in Live.
-3. Connect through the Pollinations account menu. Sign-in opens your system browser; confirm the intended account and return to Live.
-4. Type your message. A selected MIDI clip appears as a small input badge. Its notes are read again when you send.
-5. Review the response and piano-roll preview. Select a Session MIDI clip to replace, or an empty slot to fill, and press **Create clip**.
+- **Midi Journey 2:** release preparation in progress.
+- **Midi Journey Legacy:** [original 2024 download](https://github.com/pollinations/MIDIjourney/releases/tag/v2.0.0), preserved unchanged. Its old service compatibility is not guaranteed; no updated Legacy device is planned.
 
-Selecting an existing clip uses it as input. **Create clip replaces the selected Session clip's notes, title and length**, or creates a new clip in the selected empty slot. It never redirects to another slot. Other clips stay unchanged; recording clips cannot be replaced. Switching selection does not erase your prompt or conversation.
+Midi Journey 2 is the product name. The release version is **3.0.0**, avoiding
+reuse of the original download's `v2.0.0` tag.
 
-Compact responses include a piano-roll preview and a **Create clip** button. When creation is unavailable, hover, focus or tap the disabled control to learn why. No model label, response-copy action or extra technical panel. MIDI input badges show the clip name on one line. **New chat** clears this app's local conversation and creative context, not clips already created in Live.
+## The Pollinations agent
 
-Generation always calls the managed **MIDI Journey agent** (`community/pollinations-router/midijourney`) through the Pollinations SDK. It does not call the legacy `midijourney` models or pin the agent's base model. Model preferences in your message go to the agent. The app requests and accepts the agent's native YAML metadata and CSV note notation, while still accepting valid JSON replies. Managed agents reject structured-output options such as `response_format`, so none are sent. Every result is strictly validated locally before it can be written to Live; malformed notes are rejected, never silently repaired. Bounded local call diagnostics retain the original agent text without displaying or automatically logging it.
+The device uses the existing hosted **D1 prompt-based MIDIjourney agent**,
+`community/pollinations-ai/midijourney`, through the Pollinations SDK. Its prompt,
+model configuration, MCP tools and multi-step execution remain managed by
+Pollinations. No TypeScript agent upload or production routing change is part
+of this release.
 
-## Requirements and scope
+You can ask the agent to use another supported model. Execution depends on its
+available tools and models; naming a model alone is not proof that it was used.
+Multi-step tool execution is managed by the hosted agent.
 
-- macOS, Ableton Live 12 with Max for Live, and Max **9.1.5 or newer**.
-- Internet access and a Pollinations account with available Pollen.
+Sign in with your own Pollinations account. The welcome message and supported
+exact transpositions run locally; other requests use your Pollen balance.
+An agent request can involve multiple model/tool calls. No personal token is
+embedded in the device.
+
+## Use
+
+1. Load one frozen **Midi Journey 2.amxd** on **Main**.
+2. Click the OPEN/CLOSE label to open or close the editor. OPEN/CLOSE shows the click action; the connection indicator is green when signed in to Pollinations and coral when signed out.
+3. Click **Connect**, finish signing in through your system browser, and return to Live.
+4. Describe your musical idea. A selected MIDI clip appears as an input badge; its notes are read again when you send.
+5. Select a Session MIDI clip or empty slot and click **Create clip**.
+
+**Creating replaces an existing selected clip's notes, title and length, or fills the selected empty slot.** Other clips stay unchanged. Recording clips cannot be replaced. Output never redirects to a different slot.
+
+The editor stays open while you change Live's selection. Each device load starts a fresh chat. Hiding and reopening the same window keeps the conversation; **New chat** clears it without deleting Live clips or signing out. Use the native right-click menu for Copy/Paste. Disabled Send and Create clip controls explain why on hover, focus or tap.
+
+## Requirements
+
+- macOS, regular **Ableton Live 12 with Max for Live**, and **Max 9.1.5+**. The current validation target is Live 12.4.6 with **Use bundled Max** selected in Live's settings. Live Beta is not required.
+- Internet access and a Pollinations account with Pollen.
 - One device instance; local port **5178** must be free.
 
-Native acceptance of the consolidated frozen device is still pending. Do not interpret the minimum-version metadata as a tested compatibility matrix. See [Compatibility](docs/COMPATIBILITY.md).
+The connector is a transparent Max Audio Effect on Main, using Live's Object Model to access MIDI tracks. Input follows one selected MIDI clip; output targets Session View. Windows and automatic multi-selection are not supported for this release candidate. Acceptance covers the tested setup; version requirements are not a guarantee for every Live version or add-on.
 
-The first V3 scope is single-clip input and creating or replacing MIDI clips in Session View. Automatic multi-selection, Windows acceptance, and the Ableton Extensions edition are deferred. The old Max UI and SDK prototypes are preserved on [codex/archive-ui-experiments](https://github.com/pollinations/MIDIjourney/tree/codex/archive-ui-experiments), not required by this app.
-
-## Development
+## Develop
 
 Use Node **22.12+** and npm from the repository root:
 
 ```sh
 npm ci
-npm test
 npm run verify
 npm run dev
 ```
 
-The normal browser preview cannot modify Live. Stop it before loading the device because both use port 5178. Test-only fixtures use `npm run test:ui` on port 5186 and never ship in the device.
+The browser preview cannot modify Live. Stop it before loading the device: both use port 5178. `npm run test:ui` serves isolated fake-account/provider fixtures on port 5186; they never ship in the device.
 
 ```text
-app/      React conversation UI; shared Pollinations SDK and UI
-core/     MIDI validation, request construction, and bounded context
-device/   Max LiveAPI bridge, embedded UI server, browser handoff
-scripts/  Build, isolated Max staging, frozen-byte verification
-vendor/   Pinned shared UI package and provenance
-docs/     Compatibility, privacy, migration, and release acceptance
+app/      React UI and browser fixtures
+core/     Agent requests, MIDI validation and conversation context
+device/   Max LiveAPI bridge, embedded server and optimized artwork
+scripts/  Build, native-freeze staging and artifact verification
+vendor/   Pinned Pollinations UI package and license provenance
+docs/     Privacy, troubleshooting and release checklist
 ```
 
-`npm run build` produces `dist/MIDI Journey.source.amxd`, its patcher and four JavaScript dependencies. The web assets and fonts are embedded in the Node runtime. No dependency installation occurs inside Live.
+Generation uses the managed `community/pollinations-ai/midijourney` agent through `@pollinations/sdk`. Native YAML/CSV and valid JSON responses are validated locally before use. The app does not send structured-output options or choose the agent's underlying model. The shared UI and theme system come from `@pollinations/ui`; see [dependency provenance](vendor/README.md).
 
-The existing ignored `js/config.release.js` remains the local publishable-app-key input; `MIDIJOURNEY_POLLINATIONS_APP_KEY` is also supported. The old `js/` application is not a runtime dependency. No build creates or rotates keys. A key-free checkout builds a configuration-required screen for tests; release preparation rejects it. Never commit personal tokens or local configuration.
+Build configuration uses `MIDIJOURNEY_POLLINATIONS_APP_KEY` or the existing ignored `js/config.release.js`. That directory contains local configuration only. Builds never create or rotate keys. A key-free checkout builds a configuration-required screen; release preparation requires a configured publishable app key. Never commit personal tokens or local configuration.
 
-The shared UI is an unmodified, checksum-pinned package archive. See [vendor provenance](vendor/README.md). No neighboring Pollinations checkout or Ableton SDK download is needed to build.
-
-## Freeze and release
+## Build and freeze
 
 ```sh
 npm run verify
 npm run release:prepare
-# In Live: load the printed candidate on Main, Edit in Max, Freeze Device, Save.
-npm run release:verify -- "/path/printed/by/prepare/MIDI Journey.amxd"
+# Load the printed candidate in Live on Main; Edit in Max → Freeze Device → Save.
+npm run release:verify -- "/path/to/Midi Journey 2.amxd"
+npm run release:package -- "/path/to/Midi Journey 2.amxd"
 ```
 
-Preparation creates a fresh temporary project each time and leaves earlier candidates intact. Freeze is performed by Max, never simulated by rewriting a binary header. Verification checks the native container, every runtime file's exact bytes, patch connections, and UI state against the current build.
+`dist/` contains editable source output, not a frozen release. Preparation creates an isolated temporary Max project. The frozen device must embed all four runtime scripts and four optimized PNGs, with web assets/fonts inside the server bundle. It requires no Node or dependency installation inside Live.
 
-Passing that check does **not** prove MIDI behavior. Complete the [native acceptance checklist](docs/RELEASE_CHECKLIST.md), including fresh-process loading with source/staging folders unavailable, before publishing. See [Troubleshooting](docs/TROUBLESHOOTING.md), [Privacy](docs/PRIVACY.md), and [migration notes](docs/MIGRATION_V2_TO_V3.md).
+Packaging creates `release/Midi-Journey-2/` and its ZIP with the verified device, installation guide, license, third-party notices and checksums. It refuses to overwrite an existing package. Release output is ignored by Git. Artwork masters and historical test packages are kept in a separate maintainer archive, outside the repository.
 
-## Credits and license
+Verification checks the native container, embedded bytes, patch connections and UI against the current build. It does not prove Live behavior. Complete the [release checklist](docs/RELEASE_CHECKLIST.md) before publishing; do not distribute a stale candidate after source changes.
 
-Created by Elliot Fouchy and Thomas Haferlach at Pixelynx's KORUS Labs, with artistic direction from Richie Hawtin and deadmau5. Powered by [Pollinations](https://pollinations.ai/).
+[Troubleshooting](docs/TROUBLESHOOTING.md) · [Privacy](docs/PRIVACY.md) · [Changelog](CHANGELOG.md)
 
-[MIT License](LICENSE).
+## Credits
+
+Created by Elliot Fouchy and Thomas Haferlach at Pixelynx's KORUS Labs, with artistic direction from Richie Hawtin and deadmau5. Powered by [Pollinations](https://pollinations.ai/). [MIT License](LICENSE).

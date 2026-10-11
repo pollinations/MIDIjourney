@@ -95,7 +95,7 @@
 									"outlettype" : [ "" ],
 									"patching_rect" : [ 309.0, 370.390388292968794, 89.298980712890625, 20.0 ],
 									"saved_object_attributes" : 									{
-										"_persistence" : 0
+										"_persistence" : 1
 									}
 ,
 									"text" : "live.object"
@@ -158,7 +158,7 @@
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
 									"patching_rect" : [ 309.0, 317.323859972656294, 143.0, 22.0 ],
-									"text" : "call get_notes 0 0 $1 128"
+									"text" : "call get_notes 0 0 $1 127"
 								}
 
 							}

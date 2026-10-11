@@ -451,7 +451,7 @@ function parseNativeDirectoryRecord(buffer, offset, limit) {
     }
     childOffset = childEnd;
   }
-  if (childOffset !== end || !["JSON", "fold"].includes(fields.type)) {
+  if (childOffset !== end || !["JSON", "TEXT", "PNG ", "fold"].includes(fields.type)) {
     throw new Error("Frozen AMXD native dependency directory has unexpected record data");
   }
   return { ...fields, end };
@@ -591,6 +591,24 @@ function pathBasename(name) {
 
 function inspectFrozenAmxd(buffer, options) {
   assertAmpfContainer(buffer, { frozen: true });
+  // Native Freeze can store dependencies directly before the project ZIPs.
+  // Read the directory first: scanning arbitrary PNG/JS bytes for JSON is unsafe.
+  const directoryOffset = buffer.readUInt32BE(44) + AMPF_HEADER_LENGTH;
+  if (directoryOffset + 8 > buffer.length ||
+      buffer.toString("ascii", directoryOffset, directoryOffset + 4) !== "dlst" ||
+      buffer.readUInt32BE(directoryOffset + 4) !== buffer.length - directoryOffset) {
+    throw new Error("Frozen AMXD native dependency directory has an invalid header");
+  }
+  const records = [];
+  for (let offset = directoryOffset + 8; offset < buffer.length;) {
+    const record = parseNativeDirectoryRecord(buffer, offset, buffer.length);
+    records.push(record);
+    if (records.length > MAX_JSON_DOCUMENTS + MAX_ZIP_ARCHIVES) throw new Error("Too many native dependencies");
+    offset = record.end;
+  }
+  if (records.some(record => record.type === "TEXT" || record.type === "PNG ")) {
+    return inspectDirectDependencies(buffer, records, directoryOffset, options);
+  }
   const zipOffset = buffer.indexOf(ZIP_LOCAL_HEADER, AMPF_HEADER_LENGTH);
   if (zipOffset < 0) throw new Error("Frozen AMXD has no embedded ZIP payload");
   const metadata = parseFrozenJsonDocuments(buffer, zipOffset);
@@ -622,6 +640,62 @@ function inspectFrozenAmxd(buffer, options) {
       minimumLiveVersion: topLevelPatcher.minimum_live_version ?? null,
       minimumMaxVersion: topLevelPatcher.minimum_max_version ?? null,
     },
+  };
+}
+
+function inspectDirectDependencies(buffer, records, directoryOffset, options) {
+  const documents = [], nativeEntries = [], names = new Set();
+  let nextOffset = AMPF_HEADER_LENGTH + FROZEN_METADATA_HEADER_LENGTH;
+  let firstZip = null;
+  const folders = [];
+  for (const [index, record] of records.entries()) {
+    const start = record.of32 + AMPF_HEADER_LENGTH;
+    const end = start + record.sz32;
+    if (start !== nextOffset || record.sz32 === 0 || end > directoryOffset ||
+        record.vers !== 0 || record.flag !== (index === 0 ? 17 : 0) ||
+        (record.type === "fold" ? record.mdat !== 0 : record.mdat === 0) ||
+        names.has(record.name) || (index === 0 && record.type !== "JSON")) {
+      throw new Error("Frozen AMXD has inconsistent native dependency offsets or flags");
+    }
+    names.add(record.name);
+    nextOffset = end;
+    if (record.type === "fold") {
+      firstZip ??= start;
+      folders.push(record);
+      continue;
+    }
+    if (firstZip !== null || record.name !== pathBasename(record.name)) {
+      throw new Error("Frozen AMXD has invalid native dependency ordering or name");
+    }
+    const data = buffer.subarray(start, end);
+    if (record.type === "JSON") {
+      if (!/\.(amxd|maxpat)$/.test(record.name)) throw new Error("Invalid native patcher name");
+      const jsonEnd = findJsonDocumentEnd(buffer, start, end);
+      if (buffer.subarray(jsonEnd, end).some(byte => ![0, 9, 10, 13, 32].includes(byte))) throw new Error("Unexpected trailing patcher data");
+      documents.push(JSON.parse(buffer.toString("utf8", start, jsonEnd)));
+    } else {
+      if (record.type === "TEXT" && !record.name.endsWith(".js")) throw new Error("Invalid native script name");
+      if (record.type === "PNG " && (!record.name.endsWith(".png") || !data.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex")))) throw new Error("Invalid native image");
+      nativeEntries.push({ name: record.name, data });
+    }
+  }
+  if (nextOffset !== directoryOffset || firstZip === null || !documents[0]?.patcher) throw new Error("Incomplete native frozen payload");
+  const archive = parseEmbeddedZipEntries(buffer, firstZip, options);
+  assertFrozenMetadataDirectory(buffer, archive.tailOffset);
+  if (archive.tailOffset !== directoryOffset || folders.length !== archive.archives.length) throw new Error("Native ZIP directory mismatch");
+  for (const [index, folder] of folders.entries()) {
+    const zip = archive.archives[index];
+    if (folder.name !== archiveFolderName(zip) || folder.of32 + AMPF_HEADER_LENGTH !== zip.start || folder.sz32 !== zip.end - zip.start) throw new Error("Native ZIP offset mismatch");
+  }
+  const patcher = documents[0].patcher;
+  return {
+    documents, entries: archive.entries, nativeEntries,
+    nativeDirectory: { documentNames: records.filter(r => r.type === "JSON").map(r => r.name), folderNames: folders.map(r => r.name), recordCount: records.length },
+    validation: { zipOffset: firstZip, zipArchiveCount: archive.archiveCount, zipTailOffset: directoryOffset,
+      jsonDocumentCount: documents.length, zipEntryCount: archive.entries.length, nativeDependencyCount: nativeEntries.length,
+      nativeDirectoryRecordCount: records.length, amxdType: buffer.readUInt32BE(8),
+      savedByMax: patcher.appversion ?? null,
+      minimumLiveVersion: patcher.minimum_live_version ?? null, minimumMaxVersion: patcher.minimum_max_version ?? null },
   };
 }
 

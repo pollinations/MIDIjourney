@@ -2,7 +2,106 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
+import vm from "node:vm";
 import { makeDevice } from "../../scripts/device.mjs";
+
+test("native device artwork follows actual window visibility and Pollinations login independently", async () => {
+	const { patcher } = makeDevice();
+	const boxes = new Map(patcher.boxes.map(({ box }) => [box.id, box]));
+	assert.equal(patcher.devicewidth, 169);
+	assert.deepEqual(boxes.get("artwork").presentation_rect, [0, 0, 169, 169]);
+	assert.equal(boxes.get("artwork").pic, "midijourney-open-disconnected.png");
+	assert.equal(boxes.get("artwork").autofit, 1);
+	assert.equal(boxes.get("artwork").ignoreclick, 1);
+	assert.deepEqual(boxes.get("open").presentation_rect, [27, 124, 112, 33]);
+	assert.deepEqual(boxes.get("open").bgcolor, [0, 0, 0, 0]);
+	assert.equal(boxes.get("open").mode, 0);
+	assert.equal(boxes.has("led"), false);
+	assert.equal(boxes.has("retry"), false);
+	assert.equal(boxes.has("label"), false);
+	const values = [];
+	const commands = [];
+	const wind = { visible: false };
+	const tasks = [];
+	const context = {
+		Task: class {
+			constructor(fn, host) {
+				this.fn = () => fn.call(host);
+				tasks.push(this);
+			}
+			repeat() {
+				this.fn();
+			}
+			cancel() {
+				this.cancelled = true;
+			}
+		},
+		outlet(index, command) {
+			assert.equal(index, 0);
+			commands.push(command);
+			wind.visible = command === "open";
+		},
+		patcher: {
+			getnamed(name) {
+				if (name === "editor") return { subpatcher: () => ({ wind }) };
+				assert.equal(name, "device-artwork");
+				return { message: (...args) => values.push(args) };
+			},
+		},
+	};
+	vm.createContext(context);
+	vm.runInContext(
+		await readFile(new URL("../../device/panel.js", import.meta.url), "utf8"),
+		context,
+	);
+	context.init();
+	context.ready(); // A running server must not claim a Pollinations login.
+	context.refresh();
+	assert.equal(values.length, 1, "unchanged state does not reload artwork");
+	context.auth(1);
+	context.toggle();
+	context.refresh();
+	context.auth(0);
+	context.toggle();
+	context.refresh();
+	assert.deepEqual(values, [
+		["pic", "midijourney-open-disconnected.png"],
+		["pic", "midijourney-open-connected.png"],
+		["pic", "midijourney-close-connected.png"],
+		["pic", "midijourney-close-disconnected.png"],
+		["pic", "midijourney-open-disconnected.png"],
+	]);
+	assert.deepEqual(commands, ["open", "close"]);
+	context.show();
+	context.auth(1);
+	wind.visible = false; // Native title-bar close, not our button.
+	tasks[0].fn();
+	assert.deepEqual(values.at(-1), ["pic", "midijourney-open-connected.png"]);
+	context.unavailable();
+	assert.deepEqual(values.at(-1), ["pic", "midijourney-open-disconnected.png"]);
+	context.init();
+	assert.equal(tasks[0].cancelled, true);
+	context.notifydeleted();
+	assert.equal(tasks[1].cancelled, true);
+	assert.equal(boxes.get("auth-route").text, "route pollinations");
+	assert.ok(
+		patcher.lines.some(
+			({ patchline: l }) =>
+				l.source[0] === "auth-state" && l.destination[0] === "panel",
+		),
+	);
+	const server = await readFile(
+		new URL("../../device/server.mjs", import.meta.url),
+		"utf8",
+	);
+	assert.match(server, /if \(server\) return;/);
+	assert.ok(
+		patcher.lines.some(
+			({ patchline: l }) =>
+				l.source[0] === "open" && l.destination[0] === "start",
+		),
+	);
+});
 
 test("composer contains its action and reserves text space; explanations use compact leading", async () => {
 	const workspace = await readFile(
@@ -44,13 +143,16 @@ test("new device has stereo pass-through and an independent modeless web window"
 		);
 	}
 	const window = boxes.get("window").patcher;
-	assert.equal(window.title, "MIDI Journey");
+	assert.equal(window.title, "Midi Journey 2");
 	const web = window.boxes.find(({ box }) => box.id === "web").box;
 	assert.equal(web.maxclass, "jweb");
 	assert.equal(web.presentation, 1);
 	const flags = window.boxes.find(({ box }) => box.id === "config").box.text;
 	assert.match(flags, /window flags grow/);
 	assert.match(flags, /window flags float/);
+	assert.match(flags, /window size 180 80 720 900/);
+	assert.deepEqual(window.rect, [180, 80, 540, 820]);
+	assert.deepEqual(web.presentation_rect, [0, 0, 540, 820]);
 	assert.doesNotMatch(
 		JSON.stringify(patcher),
 		/close_and_send|mj_bp_|mj_nodeJS/,
@@ -104,13 +206,14 @@ test("conversation uses the shared scrollbar, quiet response titles, and a non-r
 	assert.match(styles, /\.mj-prompt\s*\{[^}]*resize: none;/);
 	assert.match(
 		styles,
-		/\.mj-composer\s*\{[^}]*border: 1px dotted var\(--color-theme-text-muted\);/,
+		/\.mj-composer\s*\{[^}]*border: 1px dotted var\(--color-theme-border\);/,
 	);
 	assert.match(styles, /\.mj-composer\s*\{[^}]*background: transparent;/);
 	assert.match(
 		styles,
-		/\.mj-composer:focus-within\s*\{[^}]*outline: 2px dotted var\(--color-theme-text-base\);/,
+		/\.mj-composer:focus-within\s*\{[^}]*border-color: var\(--color-theme-text-soft\);/,
 	);
+	assert.doesNotMatch(styles, /\.mj-composer:focus-within\s*\{[^}]*outline:/);
 	assert.match(
 		styles,
 		/\.mj-reply-title\s*\{[^}]*font-family: var\(--font-body\);/,
@@ -126,12 +229,16 @@ test("chat cards remain distinct and compact without response copy controls", as
 	assert.match(workspace, /className="mj-user-message /);
 	assert.match(workspace, /className="mj-assistant-reply /);
 	assert.match(
-		styles,
-		/\.mj-user-message\s*\{[^}]*color-mix\([^}]*var\(--polli-color-bg-active\)/,
+		workspace,
+		/<Surface\s+variant="card-themed"\s+className="mj-user-message polli:bg-theme-bg-active polli:text-theme-text-strong /,
 	);
 	assert.match(
+		workspace,
+		/<Surface\s+variant="card"\s+className="mj-assistant-reply /,
+	);
+	assert.doesNotMatch(
 		styles,
-		/\.mj-assistant-reply\s*\{\s*background: var\(--polli-color-surface-opaque\);/,
+		/\.mj-(?:user-message|assistant-reply)\s*\{[^}]*(?:background|color-mix)/,
 	);
 	assert.doesNotMatch(
 		workspace + footer + styles,
@@ -162,7 +269,7 @@ test("smaller typography uses shared tokens without scaling the layout or shrink
 	assert.doesNotMatch(styles, /\bzoom:|transform: scale\(/);
 });
 
-test("MIDI badges are single-line and only disabled creation has a hover tooltip", async () => {
+test("MIDI badges are single-line and passive elements have no native tooltips", async () => {
 	const components = await Promise.all(
 		[
 			"Workspace.tsx",
@@ -182,6 +289,33 @@ test("MIDI badges are single-line and only disabled creation has a hover tooltip
 	assert.match(badge, /className="min-w-0 truncate"/);
 	assert.doesNotMatch(badge, /summary\.noteCount|title=/);
 	assert.match(components[2], /aria-label=/);
+});
+
+test("connection guidance is confined to the focusable disabled Send tooltip", async () => {
+	const [workspace, account, app, styles] = await Promise.all(
+		["Workspace.tsx", "LiveAccount.tsx", "App.tsx", "style.css"].map((name) =>
+			readFile(new URL(`../src/${name}`, import.meta.url), "utf8"),
+		),
+	);
+	assert.doesNotMatch(
+		workspace,
+		/Connect to Pollinations above to send a message/,
+	);
+	const compactWorkspace = workspace.replace(/\s+/g, " ");
+	assert.match(
+		compactWorkspace,
+		/<Tooltip triggerAs="span" tapEnabled ariaLabel="Why Send is unavailable"/,
+	);
+	assert.match(
+		compactWorkspace,
+		/content=\{\s*connecting \? "Finish connecting in your browser\." : "Connect to Pollinations first\."\s*\}/,
+	);
+	assert.doesNotMatch(account, /Finish connecting in your browser/);
+	assert.match(account, /aria-label="Cancel connection"/);
+	assert.match(account, /mj-auth-spinner/);
+	assert.match(app, /pending=\{connecting\}/);
+	assert.match(app, /connecting=\{connecting\}/);
+	assert.match(styles, /prefers-reduced-motion: reduce/);
 });
 
 test("MIDI response cards have a comfortable maximum width without fixing their narrow-window width", async () => {
@@ -212,7 +346,7 @@ test("compact header contains only new chat, account and shared color mode contr
 		/onClick=\{fresh\}[\s\S]*disabled=\{Boolean\(chat.sendingId\)\}[\s\S]*New chat[\s\S]*\{account\}[\s\S]*<ColorModeToggle \/>/,
 	);
 	assert.equal((workspace.match(/New chat/g) || []).length, 1);
-	assert.doesNotMatch(header, /<Heading|<img|MIDI Journey/);
+	assert.doesNotMatch(header, /<Heading|<img|Midi Journey 2/);
 	assert.match(app, /account=\{\s*<LiveAccount/);
 	assert.match(
 		workspace,
@@ -260,20 +394,21 @@ test("V3 uses native clipboard menus without a custom OS clipboard bridge", asyn
 	);
 });
 
-test("fresh chats introduce MIDI Journey in an assistant bubble without an API call or response controls", async () => {
+test("the welcome remains before all exchanges without an API call or response controls", async () => {
 	const workspace = await readFile(
 		new URL("../src/Workspace.tsx", import.meta.url),
 		"utf8",
 	);
 	const welcome = workspace
 		.slice(
-			workspace.indexOf("{!chat.turns.length ? ("),
+			workspace.indexOf("{/* Always the first bubble"),
 			workspace.indexOf("chat.turns.map("),
 		)
 		.replace(/\s+/g, " ");
 	assert.match(welcome, /className="mj-assistant-reply /);
-	assert.match(welcome, /aria-label="Welcome from MIDI Journey"/);
-	assert.match(welcome, /🎹 Hi, I’m MIDI Journey\./);
+	assert.doesNotMatch(workspace, /!chat\.turns\.length\s*\?/);
+	assert.match(welcome, /aria-label="Welcome from Midi Journey 2"/);
+	assert.match(welcome, /🎹 Hi, I’m Midi Journey 2\./);
 	assert.match(welcome, /<ul className="list-disc space-y-1 pl-4">/);
 	assert.equal((welcome.match(/<li>/g) || []).length, 3);
 	assert.match(
@@ -295,6 +430,18 @@ test("fresh chats introduce MIDI Journey in an assistant bubble without an API c
 	);
 });
 
+test("production chat starts fresh with no browser persistence callback", async () => {
+	const app = await readFile(
+		new URL("../src/App.tsx", import.meta.url),
+		"utf8",
+	);
+	assert.match(app, /initial: freshChat\(\)/);
+	assert.doesNotMatch(
+		app,
+		/loadChat|saveChat|browserStorage|localStorage|save:/,
+	);
+});
+
 test("header, notices, and chat share the 30-percent narrower app limit", async () => {
 	const [app, workspace, styles] = await Promise.all(
 		["App.tsx", "Workspace.tsx", "style.css"].map((filename) =>
@@ -313,7 +460,7 @@ test("document title keeps the app name without a visible header title", async (
 		readFile(new URL("../index.html", import.meta.url), "utf8"),
 	]);
 	assert.doesNotMatch(app, /<Heading|<HeaderScene/);
-	assert.match(html, /<title>MIDI Journey \| pollinations\.ai<\/title>/);
+	assert.match(html, /<title>Midi Journey 2 \| pollinations\.ai<\/title>/);
 });
 
 test("production device is independent of the checkout and exposes only minimal controls", () => {
@@ -328,10 +475,11 @@ test("production device is independent of the checkout and exposes only minimal 
 				box.text === "node.script midijourney-server.js @autostart 1 @watch 0",
 		),
 	);
-	const retry = patcher.boxes.find(({ box }) => box.id === "retry").box;
-	assert.equal(retry.hidden, 1);
-	assert.equal(
-		patcher.boxes.find(({ box }) => box.id === "open").box.text,
-		"Open",
+	assert.deepEqual(
+		patcher.boxes
+			.filter(({ box }) => box.presentation)
+			.map(({ box }) => box.id),
+		["artwork", "open"],
 	);
+	assert.equal(patcher.boxes.find(({ box }) => box.id === "open").box.text, "");
 });

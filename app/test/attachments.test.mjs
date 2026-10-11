@@ -3,7 +3,7 @@ import test from "node:test";
 import { PollinationsMidiClient } from "../.generated/midi-core.mjs";
 import { createChatSession } from "../src/chat-session.mjs";
 import { midiInputsFeedback, resolveMidiInputs } from "../src/midi-input.mjs";
-import { loadChat, normalizeChat, saveChat } from "../src/session.mjs";
+import { normalizeChat } from "../src/session.mjs";
 
 const note = { pitch: 60, start_time: 0, duration: 1, velocity: 81.5 };
 const first = {
@@ -117,14 +117,7 @@ test("old saved pins and exclusions are ignored without deleting the chat or sen
 		attachments: [{ key: "live:1", source: first }],
 		excludedInputs: ["live:2"],
 	};
-	const data = new Map();
-	const storage = {
-		getItem: (key) => data.get(key),
-		setItem: (key, value) => data.set(key, value),
-		removeItem: (key) => data.delete(key),
-	};
-	assert.equal(saveChat(storage, raw), true);
-	const loaded = loadChat(storage);
+	const loaded = normalizeChat(raw);
 	assert.equal("attachments" in loaded, false);
 	assert.equal("excludedInputs" in loaded, false);
 	assert.equal(loaded.draft, "Unsent text");
