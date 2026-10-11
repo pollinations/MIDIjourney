@@ -1,5 +1,7 @@
 # Midi Journey 2
 
+[![Made with pollinations.ai](https://raw.githubusercontent.com/pollinations/pollinations/main/packages/ui/src/brand/badge-made-with.svg)](https://pollinations.ai/?ref=badge)
+
 Compose MIDI through conversation, bring a selected clip into the chat, and turn
 ideas into clips in Ableton Live. Midi Journey 2 adds a piano-roll preview,
 light/dark themes, browser sign-in, and a self-contained Max for Live device.
