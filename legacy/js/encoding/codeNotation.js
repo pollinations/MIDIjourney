@@ -3,7 +3,7 @@ const { clipToText } = require('./clipFormatter.js');
 
 /**
  * Converts a CSV-formatted string to Ableton note data.
- * 
+ *
  * @param {string} csvString - A CSV-formatted string.
  * @returns {Array} An array containing Ableton Midi note data.
  */
@@ -20,7 +20,7 @@ const csvToAbleton = (csvString) => {
 
 		if (!velocity)
 			velocity = 100;
-		
+
 		velocity = Math.min(Math.max(velocity, 1), 126);
 
 		lastStartTime = start_time;
@@ -37,12 +37,12 @@ const csvToAbleton = (csvString) => {
 };
 
 // construct a response with placeholder values to show as an example to chatgpt
-const responseFormat = clipToText({ 
+const responseFormat = clipToText({
 	title: "title",
 	explanation: "explanation - optional",
-	duration: "duration in beats - optional", 
+	duration: "duration in beats - optional",
 	key: "musical key - optional",
-	notation: 
+	notation:
 `${CSV_HEADER}
 ...`
 });
@@ -50,10 +50,10 @@ const responseFormat = clipToText({
 
 
 const csvNotationDescription = `
-- The response is in YAML format. 
+- The response is in YAML format.
 - The notation is in CSV format.
-- Start times and durations are in beats. 
-- Time signature is 4/4. 
+- Start times and durations are in beats.
+- Time signature is 4/4.
 - First downbeat at beat 0,  second at beat 4.
 - Drums use GM midi pitches. (e.g. 38 is a snare drum)
 - Velocity is between 0-127
@@ -99,7 +99,7 @@ const example1 = clipToText({
 	explanation: "Boards of Canada often employ simple yet emotionally evocative nostalgic chord progressions. E.g.: Am7 D7 G7 C7",
 	duration: 16,
 	key: "C major",
-	notation: 
+	notation:
 `${CSV_HEADER}
 69,0,4.25,50
 72,0.25,3.5,65
@@ -112,7 +112,7 @@ const example1 = clipToText({
 ...`});
 
 
-const csvNotationExamples = 
+const csvNotationExamples =
 `
 # Request
 
@@ -138,4 +138,3 @@ exports.csvNotationExamples = csvNotationExamples;
 
 // function to print float with 2 decimal places
 const floatPrint = (n) => parseFloat(n.toFixed(2));
-

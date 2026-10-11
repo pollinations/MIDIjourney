@@ -6,7 +6,7 @@ const CSV_HEADER = "pitch,time,duration,velocity";
 
 /**
  * Converts Ableton note data to a CSV formatted string.
- * 
+ *
  * @param {Array} notes - An array containing Ableton Midi note data.
  * @returns {string} A CSV-formatted string.
  */
@@ -29,7 +29,7 @@ const abletonToCSV = (notes) => {
 
 /**
  * Converts a CSV-formatted string to Ableton note data.
- * 
+ *
  * @param {string} csvString - A CSV-formatted string.
  * @returns {Array} An array containing Ableton Midi note data.
  */
@@ -74,10 +74,10 @@ const responseFormat = clipToText({
 });
 
 const csvNotationDescription = `
-- The response is in YAML format. 
+- The response is in YAML format.
 - The notation is in CSV format.
-- Start times and durations are in beats. 
-- Time signature is 4/4. 
+- Start times and durations are in beats.
+- Time signature is 4/4.
 - First downbeat at beat 0, second at beat 4.
 - Drums use GM midi pitches. (e.g. 38 is a snare drum)
 - Velocity is between 0-127

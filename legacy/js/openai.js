@@ -10,7 +10,7 @@ const { AbortController } = require("node-abort-controller");
 const MAX_TOKENS = Infinity;
 
 const QUOTA_EXCEEDED_ERROR = `
-OpenAI API quota exceeded. 
+OpenAI API quota exceeded.
 
 You probably need to fix your OpenAI billing information at https://platform.openai.com/account/billing/overview.
 `;

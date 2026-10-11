@@ -189,5 +189,3 @@ max.addHandlers({
 	}
 
 });
-
-

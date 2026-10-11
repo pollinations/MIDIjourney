@@ -2,7 +2,7 @@ const yaml = require('js-yaml');
 
 /**
  * Converts a YAML-formatted response to a clip object.
- * 
+ *
  * @param {string} response - The YAML-formatted response string.
  * @returns {Object} A clip object.
  */
@@ -57,7 +57,7 @@ function textToClip(response) {
 
 /**
  * Converts a clip object to a YAML-formatted response.
- * 
+ *
  * @param {Object} clip - The clip object.
  * @returns {string} A YAML-formatted response string.
  */

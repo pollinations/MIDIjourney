@@ -1,7 +1,7 @@
 
 /**
  * Returns the color code for a given chord or scale name.
- * 
+ *
  * @param {string} chordName - The name of the chord or scale.
  * @returns {number} The color code associated with the given chord name. Returns default color if chord name is not found.
  */
@@ -55,7 +55,7 @@ const chordToCamelot = Object.fromEntries(
     chords.map((chord) => [chord, camelotColors[key]])
   )
 );
-  
 
-  
+
+
   exports.getColorCodeForScale = getColorCodeForScale;

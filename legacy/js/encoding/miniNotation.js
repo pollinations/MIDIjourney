@@ -11,21 +11,21 @@ function expandChords(miniNotation) {
     // const chordRegex = /\(([^)]+)\)/g;
     const chordRegex = /{([^}]+)}/g;
     let expandedNotation = miniNotation;
-    
+
     const matches = miniNotation.match(chordRegex);
 
     if (matches) {
       matches.forEach((chordName) => {
         // Remove the surrounding parentheses and get the chord notes.
         let chordNameClean = chordName.slice(1, -1).split('/')[0];
-        
+
         // replace minor and min with m and major and maj with "" to match tonal's chord names. ignoring case
         chordNameClean = chordNameClean.replace(/minor|min/gi, 'm');
         chordNameClean = chordNameClean.replace(/major|maj/gi, '');
-        
+
 
         const chordNotes = Chord.get(chordNameClean).notes;
-        
+
         if (chordNotes && chordNotes.length > 0) {
           const chordNotesString = `[${chordNotes.join(',')}]`;
           // Replace the original chord notation with the expanded notes, joined by some delimiter like ' '.
@@ -35,7 +35,7 @@ function expandChords(miniNotation) {
         }
       });
     }
-    
+
     return expandedNotation;
   }
 
@@ -103,12 +103,12 @@ function getMidiFromNote(noteName) {
 }
 
 // construct a response with placeholder values to show as an example to chatgpt
-const responseFormat = clipToText({ 
+const responseFormat = clipToText({
 	title: "title",
 	explanation: "explanation - optional",
-	duration: "duration in beats - optional", 
+	duration: "duration in beats - optional",
 	key: "musical key - optional",
-	notation: 
+	notation:
 `...`
 });
 
@@ -224,4 +224,3 @@ module.exports = {
 }
 
 // console.log(miniToAbleton("<{Amin9} {Bmin11} {F13} {E7#9}>[4,9,2]"))
-
