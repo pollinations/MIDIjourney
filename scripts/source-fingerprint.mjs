@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 // Bind a candidate to its actual build inputs without recording local paths or
-// configuration values. Test fixtures, old experiments and generated files are
+// configuration values. Test fixtures and generated files are
 // deliberately not part of the production bundle.
 export async function sourceFingerprint(root, appKey) {
 	const files = [

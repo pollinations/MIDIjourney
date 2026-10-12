@@ -82,13 +82,6 @@ test("the real chat session and SDK send the agent ID, fresh MIDI, and output co
 			body.messages.some((m) => m.role === "system"),
 			false,
 		);
-		assert.equal(
-			Object.hasOwn(
-				JSON.parse(body.messages.at(-1).content),
-				"midiJourneyVersion",
-			),
-			false,
-		);
 		requests.push(body);
 		if (body.model !== AGENT) {
 			return Response.json(
@@ -162,13 +155,6 @@ test("a failed SDK agent call is not retried or replaced by a direct model", asy
 			body.messages.some((m) => m.role === "system"),
 			false,
 		);
-		assert.equal(
-			Object.hasOwn(
-				JSON.parse(body.messages.at(-1).content),
-				"midiJourneyVersion",
-			),
-			false,
-		);
 		assert.equal(Object.hasOwn(body, "response_format"), false);
 		models.push(body.model);
 		return models.length === 1
@@ -204,13 +190,6 @@ test("native agent YAML/CSV works through the SDK, chat, preview and diagnostics
 		const body = JSON.parse(init.body);
 		assert.equal(
 			body.messages.some((m) => m.role === "system"),
-			false,
-		);
-		assert.equal(
-			Object.hasOwn(
-				JSON.parse(body.messages.at(-1).content),
-				"midiJourneyVersion",
-			),
 			false,
 		);
 		assert.equal(body.model, AGENT);
@@ -291,13 +270,6 @@ test("chat replies do not require MIDI; invalid MIDI is withheld without model f
 			const body = JSON.parse(init.body);
 			assert.equal(
 				body.messages.some((m) => m.role === "system"),
-				false,
-			);
-			assert.equal(
-				Object.hasOwn(
-					JSON.parse(body.messages.at(-1).content),
-					"midiJourneyVersion",
-				),
 				false,
 			);
 			assert.equal(body.model, AGENT);

@@ -300,7 +300,7 @@ test("headerless conversation has account controls first, Reset last and chat-ow
 	);
 });
 
-test("V3 uses native clipboard menus without a custom OS clipboard bridge", async () => {
+test("The device uses native clipboard menus without a custom OS clipboard bridge", async () => {
 	for (const filename of [
 		"../../device/server.mjs",
 		"../../device/bridge.js",

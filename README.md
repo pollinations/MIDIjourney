@@ -13,19 +13,16 @@ account to generate MIDI using your Pollen balance.
 
 ## Downloads
 
-- **MIDI Journey 2:** [Download ZIP](https://github.com/pollinations/MIDIjourney/releases/download/v3.1.0/MIDI-Journey-2.zip) · [Release notes](https://github.com/pollinations/MIDIjourney/releases/tag/v3.1.0). Unzip and load **MIDI Journey 2.amxd** on Main in Live.
-- **MIDI Journey Legacy:** [Download original device](https://github.com/pollinations/MIDIjourney/releases/download/v2.0.0/MIDIjourney.amxd) · [2024 release notes](https://github.com/pollinations/MIDIjourney/releases/tag/v2.0.0). Preserved unchanged; compatibility with current services is not guaranteed.
+[Download ZIP](https://github.com/pollinations/MIDIjourney/releases/download/v3.1.0/MIDI-Journey-2.zip) · [Release notes](https://github.com/pollinations/MIDIjourney/releases/tag/v3.1.0). Unzip and load **MIDI Journey 2.amxd** on Main in Live.
 
-MIDI Journey 2 is the product name. The release version is **3.1.0**, avoiding
-reuse of the original download's `v2.0.0` tag.
+Current release: **MIDI Journey 2 · 3.1.0**.
 
 ## The Pollinations agent
 
 The device uses the existing hosted **D1 prompt-based MIDIjourney agent**,
 `community/pollinations-ai/midijourney`, through the Pollinations SDK. Its prompt,
 model configuration, MCP tools and multi-step execution remain managed by
-Pollinations. No TypeScript agent upload or production routing change is part
-of this release.
+Pollinations. The device calls this hosted agent directly.
 
 You can ask the agent to use another supported model. Execution depends on its
 available tools and models; naming a model alone is not proof that it was used.
@@ -103,7 +100,7 @@ npm run release:package -- "/path/to/MIDI Journey 2.amxd"
 
 The macOS native component is ad-hoc signed, without Developer ID signing or notarization. macOS may block it after download; the release does not require disabling Gatekeeper.
 
-Packaging creates `release/MIDI-Journey-2/` and its ZIP with the verified device, installation guide, license, third-party notices and checksums. It refuses to overwrite an existing package. Release output is ignored by Git. Artwork masters and historical test packages are kept in a separate maintainer archive, outside the repository.
+Packaging creates `release/MIDI-Journey-2/` and its ZIP with the verified device, installation guide, license, third-party notices and checksums. It refuses to overwrite an existing package. Release output is ignored by Git.
 
 Verification checks the native container, embedded bytes, patch connections and UI against the current build. It does not prove Live behavior. Complete the [release checklist](docs/RELEASE_CHECKLIST.md) before publishing; do not distribute a stale candidate after source changes.
 

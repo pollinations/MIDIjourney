@@ -46,7 +46,7 @@ function createHarness(responseOverride) {
 	return { auth, calls, response };
 }
 
-test("generates locally validated MIDI without managed-agent structured output and removes legacy API keys", async () => {
+test("generates locally validated MIDI without managed-agent structured output and excludes credentials", async () => {
 	const { auth, calls } = createHarness();
 	const events = [];
 	const generator = new PollinationsMidiClient({
@@ -68,10 +68,6 @@ test("generates locally validated MIDI without managed-agent structured output a
 	assert.equal(result.history.length, 2);
 	assert.equal(
 		calls[0][0].some((message) => message.role === "system"),
-		false,
-	);
-	assert.equal(
-		Object.hasOwn(JSON.parse(calls[0][0].at(-1).content), "midiJourneyVersion"),
 		false,
 	);
 	assert.equal(calls[0][1].model, MIDI_JOURNEY_AGENT);

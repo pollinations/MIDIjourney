@@ -143,7 +143,7 @@ Hiding/reopening preserves the current conversation. Trash beside Send clears it
 
 The welcome and recognized exact single-clip transpositions run locally. Other requests use your Pollinations balance and may involve agent tool calls. Paid requests are not retried automatically.
 
-The device uses the existing hosted D1 prompt-based MIDIjourney agent and its Pollinations MCP tools. No code-agent upload or production routing change is required.
+The device uses the existing hosted D1 prompt-based MIDIjourney agent and its Pollinations MCP tools.
 
 ## Privacy and troubleshooting
 

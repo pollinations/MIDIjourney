@@ -234,7 +234,7 @@ function parseMidiClipResponse(content) {
   let payload;
   try {
     const text = stripCodeFence(content);
-    // Keep old JSON replies working, but never reinterpret malformed JSON as
+    // Accept JSON replies, but never reinterpret malformed JSON as
     // YAML (which could otherwise accept number words as strings).
     payload = text.startsWith("{") || text.startsWith("[")
       ? JSON.parse(text)

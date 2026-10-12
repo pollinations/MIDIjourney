@@ -46,7 +46,7 @@ test("captured tool-budget error stays readable without a fake MIDI clip", () =>
 	assert.equal(reply.midiWarning, "");
 });
 
-test("captured image survives tool transcripts and the old prompt's dummy notation", () => {
+test("captured image survives tool transcripts and dummy notation", () => {
 	const reply = parseAgentResponse(captured["agent-image"].content);
 	assert.match(reply.text, /^!\[Generated image\]/);
 	assert.equal(reply.midi, null);

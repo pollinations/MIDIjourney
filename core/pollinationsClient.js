@@ -141,8 +141,8 @@ class PollinationsMidiClient {
 				...buildContext(safeInput.history, Boolean(safeInput.historyStatus)),
 				{ role: "user", content: JSON.stringify(request) },
 			];
-			// Always call the managed MIDI Journey agent. Legacy UI selections must
-			// never bypass it; model preferences in the prompt are for the agent.
+			// Always call the managed MIDI Journey agent; model preferences in the
+			// prompt are interpreted by the agent.
 			const model = CONFIG.defaultModel;
 			const temperature = normalizeTemperature(safeInput.temperature);
 			this.onEvent({ type: "generation_started", model });

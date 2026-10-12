@@ -18,7 +18,7 @@ function rawStatus(url, headers) {
 
 for (const embedded of [false, true]) {
   test(`device server serves WebP fixtures (${embedded ? "embedded" : "directory"} assets)`, async (t) => {
-    // MIME and exact-byte coverage needs no retired production artwork.
+    // Use a small fixture for MIME and exact-byte coverage.
     const directory = await mkdtemp(join(tmpdir(), "midi-journey-mime-"));
     t.after(() => rm(directory, { recursive: true, force: true }));
     const images = { "fixture.webp": Buffer.from("RIFF\x04\x00\x00\x00WEBP", "binary") };

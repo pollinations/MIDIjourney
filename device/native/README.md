@@ -46,9 +46,11 @@ The SDK license is included in `MAX-SDK-LICENSE`.
 
 ## Acceptance
 
-In Live 12.4.6 / bundled Max 9.1.5, the initial native prototype passed actual
-Command-A/C/V/X/Z/Shift-Z tests with multiline Unicode text, repeated paste, and
-undo/redo. Elliot also confirmed copy/paste with the physical keyboard.
-The final bundled component and frozen release must be rechecked after changes.
-Use an isolated set; verify selection replacement, copying generated reply text,
-right-click editing, Live shortcuts outside the editor, and device removal.
+The frozen 3.1.0 device passed native multiline Unicode copy/paste and clean
+startup in regular Live 12.4.6 with bundled Max 9.1.5. Automated native tests
+cover initial size, close/reopen frame retention, independent windows and
+focused editing shortcuts. See the [release record](../../docs/RELEASE_CHECKLIST.md).
+
+After native changes, recheck the final frozen device in Live: selection
+replacement, copying reply text, cut/undo/redo, right-click editing, Live's
+shortcuts outside the editor, window resizing/reopening and device removal.
