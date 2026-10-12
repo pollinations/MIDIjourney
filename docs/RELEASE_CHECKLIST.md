@@ -11,8 +11,9 @@ The product is **MIDI Journey 2**; the downloadable file is `MIDI Journey 2.amxd
 - [x] Loaded only the final frozen AMXD from an isolated folder in regular Live 12.4.6. Correct product name, Open chat, empty welcome/draft, disabled zero-count Trash and 420 × 550 initial content size observed. Native multiline Unicode Command-C/V passed on this exact artifact; test draft cleared and original clipboard restored afterward. Window lifecycle, resize, theme, connection, generation/write and toolbar behavior were checked during the release's preceding Live sessions and covered by the final automated suite.
 - [x] No conversation, generated MIDI, draft or personal login data is bundled. The embedded-file whitelist and saved jweb state pass; decompressed artifact scan finds none of the demo conversation/account markers. Sign-in on the test machine remains local. New device loads start empty; closing/reopening the same device preserves its in-memory session.
 - [x] Packaged the frozen device, installation guide, license, dependency/font notices and SHA256SUMS. Extracted ZIP passes every checksum.
-- [ ] Publish source and v3.1.0, then download and verify the published archive. Source commit is recorded by the release tag.
-- [ ] Update approved Pollinations submission #17053 with the MIDI Journey 2 name, v3.1.0 download and this same screenshot; no duplicate submission.
+- [x] Published [v3.1.0](https://github.com/pollinations/MIDIjourney/releases/tag/v3.1.0) from source `4143aaf9247d6aa25ae3ed763825f68bbb602af9`. GitHub CI passes on Node 22 and 24. Downloaded the public ZIP and verified its checksum and every extracted file against the tested package. The CI native fixture was positioned within the actual runner screen; AppKit otherwise moves an off-screen fixture on first show. All geometry assertions remain intact; no production bytes changed.
+- [x] Updated approved Pollinations submission [#17053](https://github.com/pollinations/pollinations/issues/17053) with the MIDI Journey 2 name, v3.1.0 download and commit-pinned screenshot; no duplicate submission.
+- [ ] Catalog JSON name/screenshot update is prepared and validated; separate catalog PR awaits confirmation per that repository’s instructions.
 
 Verified artifacts:
 
