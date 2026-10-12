@@ -2,32 +2,36 @@ import {
 	Alert,
 	ArrowRightIcon,
 	Button,
-	ColorModeToggle,
 	Field,
 	Heading,
-	PlusIcon,
 	ScrollArea,
 	Surface,
 	Text,
 	Textarea,
-	Tooltip,
+	TrashIcon,
+	XIcon,
 } from "@pollinations/ui";
 import { Markdown } from "@pollinations/ui/markdown";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
-import { MessageMidiInput, MidiInputFeedback } from "./MidiInputFeedback";
+import { CompactInputStatus, CompactMidi } from "./CompactMidi";
+import { MidiClipButton } from "./MidiClipButton";
+import { MessageMidiInput } from "./MidiInputFeedback";
 import { midiInputsFeedback } from "./midi-input.mjs";
-import { PianoRoll } from "./PianoRoll";
-import { ReplyFooter } from "./ReplyFooter";
-import { clipCreationUnavailable } from "./reply-presentation.mjs";
+import {
+	clipCreationUnavailable,
+	clipWriteAction,
+	clipWriteFeedback,
+} from "./reply-presentation.mjs";
 import type { ChatState, LiveContext, MidiAttachment } from "./types";
+import { useCompactLayout } from "./useCompactLayout";
 
 type Props = {
-	account: ReactNode;
 	notice?: ReactNode;
 	chat: ChatState;
 	live: LiveContext;
 	loggedIn: boolean;
-	connecting?: boolean;
+	accountControl: ReactNode;
+	connectControl: ReactNode;
 	onPrompt: (text: string) => void;
 	onGenerate: () => void;
 	onCancel: () => void;
@@ -35,12 +39,12 @@ type Props = {
 	onSend: (id: string) => void;
 };
 export function Workspace({
-	account,
 	notice,
 	chat,
 	live,
 	loggedIn,
-	connecting = false,
+	accountControl,
+	connectControl,
 	onPrompt,
 	onGenerate,
 	onCancel,
@@ -50,16 +54,29 @@ export function Workspace({
 	const scroll = useRef<HTMLDivElement>(null);
 	const follow = useRef(true);
 	const composer = useRef<HTMLTextAreaElement>(null);
+	const compact = useCompactLayout();
 	function changePrompt(value: string) {
 		onPrompt(value);
 	}
 	const last = chat.turns.at(-1);
+	const midiTurn = [...chat.turns].reverse().find((turn) => turn.result);
+	const midiCount = chat.turns.filter(
+		(turn) => turn.result?.notes.length,
+	).length;
+	const canReset = loggedIn && midiCount > 0;
 	const creationUnavailable = clipCreationUnavailable(live);
+	const writeAction = clipWriteAction(live);
 	const input = useMemo(() => midiInputsFeedback(live), [live]) as {
 		items: MidiAttachment[];
 		error?: string;
 		checking?: boolean;
 	};
+	const compactNotice =
+		notice ||
+		input.error ||
+		(last?.status !== "canceled" && last?.error) ||
+		last?.midiWarning ||
+		(midiTurn?.writeError ? clipWriteFeedback(midiTurn.writeError) : null);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: These content changes trigger scrolling after React updates the conversation DOM.
 	useEffect(() => {
 		if (follow.current && scroll.current)
@@ -70,6 +87,7 @@ export function Workspace({
 		last?.inputs,
 		last?.notice,
 		last?.writeError,
+		compact,
 	]);
 	function submit() {
 		if (
@@ -89,7 +107,7 @@ export function Workspace({
 			size="md"
 			type="submit"
 			aria-label="Send"
-			className="mj-send"
+			className="mj-round mj-send"
 			disabled={
 				!loggedIn ||
 				!chat.draft.trim() ||
@@ -100,36 +118,38 @@ export function Workspace({
 		</Button>
 	);
 	function fresh() {
+		if (!canReset) return;
 		follow.current = true;
 		onNewChat();
 		composer.current?.focus();
 	}
 	return (
-		<>
-			<header className="mj-app-width mj-header mx-auto z-30 flex w-full shrink-0 items-center justify-between gap-2 px-5 py-3">
-				<Button
-					size="sm"
-					type="button"
-					className="mj-new-chat shrink-0"
-					onClick={fresh}
-					disabled={Boolean(chat.sendingId)}
-				>
-					<PlusIcon aria-hidden="true" className="h-3 w-3" />
-					New chat
-				</Button>
-				<div className="mj-header-controls ml-auto flex min-w-0 items-center justify-end gap-1.5">
-					<div className="mj-header-account">{account}</div>
-					<ColorModeToggle />
-				</div>
-			</header>
-			<main className="mj-app-width mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col">
-				<Surface
-					role="region"
-					variant="panel"
-					className="mj-chat-panel mj-scroll polli-scrollbar-subtle"
-					data-scrollbar-active="true"
-					aria-label="Musical conversation"
-				>
+		<main
+			className="mj-app-width mj-workspace mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col"
+			data-compact={compact}
+		>
+			<Surface
+				role="region"
+				variant="panel"
+				className="mj-chat-panel mj-scroll polli-scrollbar-subtle"
+				data-scrollbar-active="true"
+				aria-label="Musical conversation"
+			>
+				{compact ? (
+					<CompactMidi busy={Boolean(chat.busyId)}>
+						{midiTurn?.result ? (
+							<MidiClipButton
+								clip={midiTurn.result}
+								compact
+								sending={chat.sendingId === midiTurn.id}
+								disabled={Boolean(chat.busyId || chat.sendingId)}
+								actionLabel={writeAction}
+								unavailableReason={creationUnavailable}
+								onWrite={() => onSend(midiTurn.id)}
+							/>
+						) : null}
+					</CompactMidi>
+				) : (
 					<ScrollArea
 						ref={scroll}
 						role="region"
@@ -146,9 +166,11 @@ export function Workspace({
 						<Surface
 							variant="card"
 							className="mj-assistant-reply mr-6 p-3 space-y-2"
-							aria-label="Welcome from Midi Journey 2"
+							aria-label="MIDI generation introduction"
 						>
-							<Text size="sm">🎹 Hi, I’m Midi Journey 2.</Text>
+							<Heading size="card" className="mj-reply-title">
+								Generative MIDI clips
+							</Heading>
 							<ul className="list-disc space-y-1 pl-4">
 								<li>
 									<Text size="sm">
@@ -163,8 +185,8 @@ export function Workspace({
 								</li>
 								<li>
 									<Text size="sm">
-										<strong>Create clip</strong> fills an empty slot or replaces
-										the selected clip.
+										<strong>Click a MIDI preview</strong> to write it to the
+										selected slot or replace the selected clip.
 									</Text>
 								</li>
 							</ul>
@@ -191,137 +213,161 @@ export function Workspace({
 										{turn.prompt}
 									</Text>
 								</Surface>
-								<Surface
-									variant="card"
-									className="mj-assistant-reply mr-6 p-3 space-y-2"
-									aria-label="Assistant reply"
-								>
-									{turn.status === "pending" ? (
-										<Text
-											size="sm"
-											role="status"
-											className="flex items-center gap-2"
-										>
-											<span className="mj-thinking-dots" aria-hidden="true">
-												<span />
-												<span />
-												<span />
-											</span>
-											Thinking…
-										</Text>
-									) : null}
-									{turn.error ? (
-										<Alert
-											intent={turn.status === "canceled" ? "warning" : "danger"}
-										>
-											{turn.error}
-										</Alert>
-									) : null}
-									{turn.text ? (
-										<Markdown className="mj-chat-text">{turn.text}</Markdown>
-									) : null}
-									{turn.midiWarning ? (
-										<Alert intent="warning">{turn.midiWarning}</Alert>
-									) : null}
-									{turn.result ? (
-										<>
-											<Heading size="card" className="mj-reply-title">
-												{turn.result.title}
-											</Heading>
+								{turn.status !== "canceled" && (
+									<Surface
+										variant="card"
+										className="mj-assistant-reply mr-6 p-3 space-y-2"
+										aria-label="Assistant reply"
+									>
+										{turn.status === "pending" ? (
 											<Text
 												size="sm"
-												className="mj-reply-explanation whitespace-pre-wrap break-words"
+												role="status"
+												className="flex items-center gap-2"
 											>
-												{turn.result.explanation}
+												<span className="mj-thinking-dots" aria-hidden="true">
+													<span />
+													<span />
+													<span />
+												</span>
+												Thinking…
 											</Text>
-											<PianoRoll clip={turn.result} />
-										</>
-									) : null}
-									<ReplyFooter
-										turn={turn}
-										replyNumber={index + 1}
-										sending={chat.sendingId === turn.id}
-										unavailableReason={creationUnavailable}
-										disabled={Boolean(chat.busyId || chat.sendingId)}
-										onSend={() => onSend(turn.id)}
-									/>
-								</Surface>
+										) : null}
+										{turn.error ? (
+											<Alert intent="danger">{turn.error}</Alert>
+										) : null}
+										{turn.text ? (
+											<Markdown className="mj-chat-text">{turn.text}</Markdown>
+										) : null}
+										{turn.writeError ? (
+											<Alert intent="danger">
+												{clipWriteFeedback(turn.writeError)}
+											</Alert>
+										) : null}
+										{turn.midiWarning ? (
+											<Alert intent="warning">{turn.midiWarning}</Alert>
+										) : null}
+										{turn.result ? (
+											<>
+												<Heading size="card" className="mj-reply-title">
+													{turn.result.title}
+												</Heading>
+												<Text
+													size="sm"
+													className="mj-reply-explanation whitespace-pre-wrap break-words"
+												>
+													{turn.result.explanation}
+												</Text>
+												<MidiClipButton
+													clip={turn.result}
+													sending={chat.sendingId === turn.id}
+													disabled={Boolean(chat.busyId || chat.sendingId)}
+													actionLabel={writeAction}
+													unavailableReason={creationUnavailable}
+													onWrite={() => onSend(turn.id)}
+												/>
+											</>
+										) : null}
+									</Surface>
+								)}
 							</article>
 						))}
 					</ScrollArea>
+				)}
 
-					<form
-						className="shrink-0 space-y-2"
-						onSubmit={(event) => {
-							event.preventDefault();
-							submit();
-						}}
-					>
-						{notice ? (
-							<div className="mj-app-width w-full shrink-0" role="alert">
-								{notice}
-							</div>
-						) : null}
-						<Field.Root className="mj-composer flex min-w-0 flex-col">
-							<MidiInputFeedback {...input} />
-							<Field.Label htmlFor="chat-message" className="sr-only">
-								<Text as="span" size="xs" tone="muted">
-									Message
-								</Text>
-							</Field.Label>
-							<Textarea
-								ref={composer}
-								id="chat-message"
-								value={chat.draft}
-								onChange={(event) => changePrompt(event.target.value)}
-								className="mj-prompt mj-scroll polli-scrollbar-subtle polli:min-w-0 polli:text-sm polli:leading-relaxed"
-								data-scrollbar-active="true"
-								rows={2}
-								maxLength={12000}
-								required
-								onKeyDown={(event) => {
+				<form
+					className="mj-composer-form flex shrink-0 flex-col gap-2"
+					noValidate
+					onSubmit={(event) => {
+						event.preventDefault();
+						submit();
+					}}
+				>
+					{(compact ? compactNotice : notice || input.error) ? (
+						<div
+							className="mj-app-width mj-composer-notice w-full shrink-0"
+							role="alert"
+						>
+							{compact ? compactNotice : notice || input.error}
+						</div>
+					) : null}
+					<div className="mj-composer-toolbar">
+						{accountControl}
+						{/* Keep login mounted through the final handoff acknowledgement. */}
+						{connectControl}
+
+						{(loggedIn || input.items.length > 0) && (
+							<CompactInputStatus {...input} />
+						)}
+
+						{loggedIn && chat.busyId ? (
+							<Button
+								size="md"
+								type="button"
+								className="mj-round"
+								aria-label="Cancel generation"
+								onClick={onCancel}
+							>
+								<XIcon aria-hidden="true" className="h-5 w-5" />
+							</Button>
+						) : (
+							sendButton
+						)}
+						<Button
+							size="md"
+							type="button"
+							className={`mj-round mj-quiet${midiCount ? " mj-reset" : ""}`}
+							intent="neutral"
+							aria-label="Reset conversation"
+							aria-description={`Clear chat history with ${midiCount} generated MIDI clips.`}
+							onClick={fresh}
+							disabled={!canReset}
+						>
+							<TrashIcon aria-hidden="true" className="h-5 w-5" />
+							{midiCount > 0 && (
+								<span className="mj-reset-count" aria-hidden="true">
+									{midiCount}
+								</span>
+							)}
+						</Button>
+					</div>
+					<Field.Root className="mj-composer flex min-w-0 flex-col">
+						<Field.Label htmlFor="chat-message" className="sr-only">
+							<Text as="span" size="xs" tone="muted">
+								Message
+							</Text>
+						</Field.Label>
+						<Textarea
+							ref={(node) => {
+								composer.current = node;
+							}}
+							id="chat-message"
+							value={chat.draft}
+							onChange={(event) => changePrompt(event.target.value)}
+							className="mj-prompt mj-scroll polli-scrollbar-subtle polli:min-w-0 polli:text-sm polli:leading-relaxed"
+							data-scrollbar-active="true"
+							rows={compact ? 3 : 6}
+							maxLength={12000}
+							onKeyDown={(event) => {
+								if (
+									event.key === "Enter" &&
+									!event.shiftKey &&
+									!event.nativeEvent.isComposing
+								) {
+									event.preventDefault();
 									if (
-										event.key === "Enter" &&
-										!event.shiftKey &&
-										!event.nativeEvent.isComposing
-									) {
-										event.preventDefault();
-										if (
-											loggedIn &&
-											!chat.busyId &&
-											!chat.sendingId &&
-											chat.draft.trim()
-										)
-											submit();
-									}
-								}}
-							/>
-							<div className="mj-composer-action">
-								{chat.busyId ? (
-									<Button size="md" type="button" onClick={onCancel}>
-										Cancel
-									</Button>
-								) : !loggedIn ? (
-									<Tooltip
-										triggerAs="span"
-										tapEnabled
-										ariaLabel="Why Send is unavailable"
-										content={
-											connecting
-												? "Finish connecting in your browser."
-												: "Connect to Pollinations first."
-										}
-									>
-										{sendButton}
-									</Tooltip>
-								) : (
-									sendButton
-								)}
-							</div>
-						</Field.Root>
-					</form>
-				</Surface>
-			</main>
-		</>
+										loggedIn &&
+										!chat.busyId &&
+										!chat.sendingId &&
+										chat.draft.trim()
+									)
+										submit();
+								}
+							}}
+						/>
+					</Field.Root>
+				</form>
+			</Surface>
+		</main>
 	);
 }

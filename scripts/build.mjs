@@ -15,15 +15,18 @@ import react from "@vitejs/plugin-react";
 import { parse } from "acorn";
 import { build } from "esbuild";
 import { build as viteBuild } from "vite";
+import { buildNative } from "./build-native.mjs";
 import { makeDevice } from "./device.mjs";
-import { BUILD_FILES, MEDIA_FILES } from "./release-lib.mjs";
+import { BUILD_FILES } from "./release-lib.mjs";
 import { sourceFingerprint } from "./source-fingerprint.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
 const { CONFIG, hasConfiguredAppKey } = require("../core/config.js");
 const dist = resolve(root, "dist");
 await mkdir(dist, { recursive: true });
+await buildNative(dist);
 // Max js uses ES5, even though the browser and Node runtimes support modern JS.
 for (const name of ["bridge", "window", "panel"]) {
 	const file = resolve(root, `device/${name}.js`);
@@ -114,14 +117,9 @@ for (const file of ["bridge", "window", "panel"])
 		resolve(root, `device/${file}.js`),
 		resolve(dist, `midijourney-${file}.js`),
 	);
-for (const name of MEDIA_FILES)
-	await copyFile(
-		resolve(root, "device/artwork", name.replace("midijourney-", "")),
-		resolve(dist, name),
-	);
 const patch = makeDevice();
 await writeFile(
-	resolve(dist, "Midi Journey 2.maxpat"),
+	resolve(dist, "MIDI Journey 2.maxpat"),
 	JSON.stringify(patch, null, 2),
 );
 const body = Buffer.from(`${JSON.stringify(patch)}\n\0`);
@@ -135,7 +133,7 @@ header.writeUInt32LE(1, 20);
 header.write("ptch", 24);
 header.writeUInt32LE(body.length, 28);
 await writeFile(
-	resolve(dist, "Midi Journey 2.source.amxd"),
+	resolve(dist, "MIDI Journey 2.source.amxd"),
 	Buffer.concat([header, body]),
 );
 const hashes = {};
@@ -148,7 +146,7 @@ await writeFile(
 	JSON.stringify(
 		{
 			format: "midi-journey-build-v1",
-			version: "3.0.0",
+			version,
 			configured: hasConfiguredAppKey(),
 			agentBaseUrl: CONFIG.agentBaseUrl,
 			agentModel: CONFIG.defaultModel,
@@ -163,5 +161,5 @@ await writeFile(
 	),
 );
 console.log(
-	"Built Midi Journey 2 source device with embedded web assets. Native Max freeze is still required.",
+	"Built MIDI Journey 2 source device with embedded web assets. Native Max freeze is still required.",
 );

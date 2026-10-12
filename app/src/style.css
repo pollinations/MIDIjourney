@@ -3,8 +3,18 @@
 @layer theme, base, components, utilities;
 @import "@pollinations/ui/app.css";
 
-/* Shared Pollinations fonts, colors and controls; compact, resizable chat host. */
+/* Shared Pollinations controls with native interface typography. */
 :root {
+	/* Live's native face when exposed to jweb; a system face elsewhere. */
+	--mj-font-ui:
+		"Ableton Sans Small", system-ui, -apple-system, BlinkMacSystemFont,
+		"Segoe UI", sans-serif;
+	--polli-font-body: var(--mj-font-ui);
+	--polli-font-heading: var(--mj-font-ui);
+	--polli-font-subheading: var(--mj-font-ui);
+	--font-body: var(--mj-font-ui);
+	--font-heading: var(--mj-font-ui);
+	--font-subheading: var(--mj-font-ui);
 	/* Typography only: keep rem-based layout, control padding and MIDI sizing. */
 	--text-sm: 0.8125rem;
 	--text-sm--line-height: 1.25rem;
@@ -13,83 +23,133 @@
 	--polli-text-base: 0.9375rem;
 	--polli-text-2xl: 1.375rem;
 }
+/* No brand palette: Live supplies semantic colors. Neutral system colors are
+   used only while the host palette is unavailable (e.g. before device startup). */
+:root {
+	--mj-live-background: Canvas;
+	--mj-live-text: CanvasText;
+	--mj-live-surface: var(--mj-live-background);
+	--mj-live-controlOff: color-mix(
+		in srgb,
+		var(--mj-live-text) 10%,
+		var(--mj-live-background)
+	);
+	--mj-live-textOff: var(--mj-live-text);
+	--mj-live-controlOn: var(--mj-live-text);
+	--mj-live-textOn: var(--mj-live-background);
+	--mj-live-disabled: var(--mj-live-controlOff);
+	--mj-live-disabledText: var(--mj-live-muted);
+	--mj-live-muted: color-mix(
+		in srgb,
+		var(--mj-live-text) 55%,
+		var(--mj-live-background)
+	);
+	--mj-live-border: var(--mj-live-controlOff);
+	--mj-live-focus: var(--mj-live-text);
+	--mj-live-selection: var(--mj-live-controlOn);
+	--mj-live-selectionText: var(--mj-live-textOn);
+	--mj-live-scrollbar: var(--mj-live-muted);
+	--mj-live-display: var(--mj-live-surface);
+	--mj-live-displayText: var(--mj-live-text);
+	--mj-live-displayMuted: var(--mj-live-muted);
+	--mj-live-displayLine: var(--mj-live-border);
+	--mj-live-displayShape: var(--mj-live-displayText);
+	--mj-live-alert: var(--mj-live-controlOn);
+	--mj-live-success: var(--mj-live-text);
+}
+/* Override package colors on theme scopes as well as the root, including SDK
+   menus rendered in portals. No fixed amber, blue, or warm-gray theme remains. */
+:root,
+:root.dark,
+:root [data-theme] {
+	--polli-color-app-bg: var(--mj-live-background);
+	--polli-color-surface-block: var(--mj-live-background);
+	--polli-color-surface-opaque: var(--mj-live-surface);
+	--polli-color-surface-menu: var(--mj-live-surface);
+	--polli-color-surface-translucent: var(--mj-live-surface);
+	--polli-color-surface-white: var(--mj-live-surface);
+	--polli-color-text-base: var(--mj-live-text);
+	--polli-color-text-strong: var(--mj-live-text);
+	--polli-color-text-muted: var(--mj-live-muted);
+	--polli-color-text-soft: var(--mj-live-focus);
+	--polli-color-text-hover: var(--mj-live-textOn);
+	--polli-color-bg-pale: var(--mj-live-surface);
+	--polli-color-bg-subtle: var(--mj-live-controlOff);
+	--polli-color-bg-active: var(--mj-live-controlOn);
+	--polli-color-bg-hover: color-mix(
+		in srgb,
+		var(--mj-live-controlOn) 90%,
+		var(--mj-live-textOn)
+	);
+	--polli-color-border: var(--mj-live-focus);
+	--polli-color-divider: var(--mj-live-border);
+	--polli-color-scrollbar-thumb: var(--mj-live-scrollbar);
+	--polli-color-brand-dark: var(--mj-live-text);
+	--polli-color-brand-accent: var(--mj-live-controlOn);
+	--polli-color-info-bg-light: var(--mj-live-selection);
+	--polli-color-info-bg-hover: var(--mj-live-selection);
+	--polli-color-info-text: var(--mj-live-selectionText);
+	--polli-color-warning-bg-light: var(--mj-live-alert);
+	--polli-color-warning-text: var(--mj-live-textOn);
+	--polli-color-danger-bg-light: var(--mj-live-alert);
+	--polli-color-danger-bg-hover: var(--mj-live-alert);
+	--polli-color-danger-text: var(--mj-live-textOn);
+	--polli-color-danger-border: var(--mj-live-alert);
+	--polli-color-success-bg-light: var(--mj-live-surface);
+	--polli-color-success-text: var(--mj-live-success);
+	--polli-color-success-bright: var(--mj-live-success);
+	--polli-color-success-text-on-bright: var(--mj-live-textOn);
+	--polli-color-paid-pale: var(--mj-live-controlOff);
+	--polli-color-paid-soft: var(--mj-live-textOff);
+	--polli-color-paid-deep: var(--mj-live-textOff);
+	--polli-color-tier-pale: var(--mj-live-controlOff);
+	--polli-color-tier-soft: var(--mj-live-textOff);
+	--polli-color-tier-deep: var(--mj-live-textOff);
+	--polli-color-ink-50: var(--mj-live-surface);
+	--polli-color-ink-100: var(--mj-live-controlOff);
+	--polli-color-ink-200: var(--mj-live-border);
+	--polli-color-ink-300: var(--mj-live-border);
+	--polli-color-ink-400: var(--mj-live-muted);
+	--polli-color-ink-500: var(--mj-live-muted);
+	--polli-color-ink-600: var(--mj-live-muted);
+	--polli-color-ink-700: var(--mj-live-text);
+	--polli-color-ink-800: var(--mj-live-text);
+	--polli-color-ink-900: var(--mj-live-text);
+	--polli-color-ink-950: var(--mj-live-text);
+}
+/* Keep Live's active foreground/background pair together inside SDK controls,
+   including nested labels in the account pill and sent-message text. */
+:root .polli\:bg-theme-bg-active {
+	--polli-color-text-base: var(--mj-live-textOn);
+	--polli-color-text-strong: var(--mj-live-textOn);
+	color: var(--mj-live-textOn);
+}
+button.polli-control.polli\:bg-theme-bg-active:disabled {
+	background: var(--mj-live-disabled);
+	color: var(--mj-live-disabledText);
+	opacity: 1;
+}
+.polli\:focus-visible\:bg-theme-bg-hover:focus-visible {
+	color: var(--mj-live-textOn);
+}
+button.polli-control[data-intent="neutral"] {
+	color: var(--mj-live-textOff);
+}
+::selection {
+	background: var(--mj-live-selection);
+	color: var(--mj-live-selectionText);
+}
+
 body {
+	font-family: var(--mj-font-ui);
 	font-size: var(--text-sm);
+	font-weight: 400;
 }
 .mj-app {
 	background: var(--polli-color-surface-block);
 }
 .mj-app-width {
 	max-width: 44.8rem;
-}
-.mj-new-chat {
-	background: color-mix(
-		in oklab,
-		var(--polli-color-text-muted) 12%,
-		var(--polli-color-surface-opaque)
-	);
-	color: var(--polli-color-text-muted);
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 0.25rem;
-	min-height: 2rem;
-	font-size: 0.75rem;
-	white-space: nowrap;
-}
-.mj-new-chat:hover {
-	background: color-mix(
-		in oklab,
-		var(--polli-color-text-muted) 20%,
-		var(--polli-color-surface-opaque)
-	);
-}
-.mj-header-account {
-	min-width: 0;
-	max-width: 12rem;
-}
-.mj-header-account button {
-	gap: 0.25rem;
-	padding: 0.25rem 0.5rem;
-	font-size: 0.75rem;
-}
-.mj-header-account [data-polli="user-avatar"],
-.mj-header-account [aria-label="Open dashboard"] > * {
-	width: 1.5rem;
-	height: 1.5rem;
-	flex-shrink: 0;
-	font-size: 0.625rem;
-}
-.mj-header-account [data-polli="user-name"],
-.mj-header-account button span[title] {
-	max-width: 5.5rem;
-	font-size: 0.75rem;
-	line-height: 1.25;
-}
-.mj-header-account [data-polli="balance"],
-.mj-header-account button span[id] {
-	height: auto;
-	min-height: 0;
-	font-size: 0.625rem;
-	line-height: 1.25;
-}
-.mj-header-account [data-theme="accent"] {
-	gap: 0.375rem;
-	padding: 0.125rem 0.375rem;
-}
-.mj-header-account button {
-	padding-block: 0;
-}
-.mj-header-account button > svg {
-	width: 0.75rem;
-	height: 0.75rem;
-}
-@media (max-width: 319px) {
-	/* If two rows are unavoidable, keep account controls above New chat. */
-	.mj-header {
-		flex-direction: column-reverse;
-		align-items: flex-start;
-	}
 }
 .mj-chat-panel {
 	--mj-panel-padding: clamp(0.75rem, 2.5vw, 1.25rem);
@@ -106,12 +166,23 @@ body {
 .mj-assistant-reply {
 	max-width: 31.5rem;
 }
+.mj-assistant-reply:has(> .mj-midi-write) {
+	padding: 0.75rem 0 0;
+	overflow: hidden;
+}
+.mj-assistant-reply:has(> .mj-midi-write) > :not(.mj-midi-write) {
+	margin-inline: 0.75rem;
+}
+.mj-assistant-reply strong {
+	font-weight: 600;
+}
 .mj-scroll {
-	--polli-color-scrollbar-thumb: color-mix(
-		in oklab,
-		var(--color-theme-text-muted) 45%,
-		transparent
-	);
+	--polli-color-scrollbar-thumb: var(--mj-live-scrollbar);
+}
+/* The SDK textarea otherwise switches its scrollbar to the accent on focus. */
+.mj-prompt.mj-scroll,
+.mj-prompt.mj-scroll:focus {
+	scrollbar-color: var(--polli-color-scrollbar-thumb) transparent;
 }
 .mj-chat-panel > .mj-scroll {
 	min-height: 6rem;
@@ -151,9 +222,14 @@ body {
 }
 .mj-prompt {
 	box-sizing: border-box;
-	height: clamp(4rem, 12dvh, 7rem);
-	min-height: 3.5rem;
-	max-height: 25dvh;
+	font-size: var(--polli-text-base);
+	height: 10rem;
+	min-height: 10rem;
+	max-height: 10rem;
+	line-height: 1.5rem;
+	padding: 0.5rem;
+	overflow-y: auto;
+	scrollbar-gutter: stable;
 	overflow-x: hidden;
 	resize: none;
 	border: 0;
@@ -166,27 +242,138 @@ body {
 }
 .mj-composer {
 	position: relative;
-	padding-bottom: 3rem;
-	border: 1px dotted var(--color-theme-border);
+	padding: 4px;
+	border: 1px solid var(--mj-live-muted);
 	border-radius: 0.75rem;
 	background: transparent;
 	overflow: hidden;
 }
-.mj-composer-action {
-	position: absolute;
-	right: 0.5rem;
-	bottom: 0.5rem;
+.mj-composer-toolbar {
+	--mj-control-size: 2.5rem;
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 6px;
+	padding: 4px;
 }
-.mj-send {
+.mj-composer-toolbar > * {
+	flex-shrink: 0;
+}
+.mj-chat-connect {
+	margin-right: auto;
+}
+.mj-composer-toolbar
+	:is(
+		.mj-round,
+		.mj-chat-account,
+		.mj-chat-account > a,
+		.mj-pollinations-connect
+	) {
+	box-sizing: border-box;
+	height: var(--mj-control-size);
+	min-height: var(--mj-control-size);
+	max-height: var(--mj-control-size);
+}
+.mj-compact-input {
+	flex: 1 1 0;
+	min-width: 0;
+	display: flex;
+	justify-content: flex-end;
+}
+.mj-input-summary {
+	max-width: 100%;
+	width: fit-content;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding-inline: 8px;
+	min-width: 0;
+}
+.mj-input-summary > span,
+.mj-midi-badge > span {
+	color: inherit;
+}
+.mj-round {
 	width: 2.5rem;
 	height: 2.5rem;
 	min-width: 2.5rem;
 	padding: 0;
 	border-radius: 50%;
 }
-.mj-auth-cancel {
-	background: var(--color-theme-bg-subtle);
-	color: var(--color-theme-text-base);
+.mj-send > svg {
+	transform: rotate(-90deg);
+}
+.mj-round.mj-quiet {
+	background: transparent;
+}
+.mj-round.mj-quiet:enabled:is(:hover, :focus-visible) {
+	background: var(--mj-live-controlOff);
+}
+.mj-round.mj-reset {
+	width: auto;
+	padding-inline: 12px;
+	gap: 6px;
+	border-radius: 999px;
+}
+.mj-reset-count {
+	font-size: 17px;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+}
+.mj-reset svg {
+	flex-shrink: 0;
+}
+.mj-chat-account {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	display: flex;
+	align-items: center;
+	height: 2.5rem;
+	border-radius: 999px;
+	background: transparent;
+	transition: background-color 150ms;
+}
+.mj-chat-account:hover,
+.mj-chat-account:has(> a:focus-visible) {
+	background: var(--mj-live-controlOff);
+}
+:root .mj-chat-account > a {
+	color: var(--mj-live-textOff);
+	background: transparent;
+	height: 2.5rem;
+	box-shadow: none;
+}
+:root .mj-chat-account > a:hover {
+	background: color-mix(in srgb, var(--mj-live-textOff) 8%, transparent);
+}
+.mj-account-avatar {
+	width: 2.5rem;
+	min-width: 2.5rem;
+	padding: 4px;
+	border-radius: 50%;
+}
+.mj-account-avatar > img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: 50%;
+}
+.mj-account-avatar > svg {
+	width: 24px;
+	height: 24px;
+}
+.mj-account-pollen {
+	min-width: 3ch;
+	padding: 0 10px 0 6px;
+	border-radius: 0 999px 999px 0;
+	font-size: 17px;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+}
+:root button.polli-control.mj-auth-cancel {
+	background: var(--mj-live-controlOff);
+	color: var(--mj-live-textOff);
 	box-shadow: none;
 }
 .mj-auth-spinner {
@@ -196,6 +383,7 @@ body {
 	border-right-color: transparent;
 	border-radius: 50%;
 	opacity: 0.65;
+	flex-shrink: 0;
 	animation: mj-auth-spin 1s linear infinite;
 }
 @keyframes mj-auth-spin {
@@ -209,7 +397,7 @@ body {
 	}
 }
 .mj-composer:focus-within {
-	border-color: var(--color-theme-text-soft);
+	border-color: var(--mj-live-focus);
 }
 .mj-midi-inputs {
 	min-width: 0;
@@ -274,8 +462,6 @@ body {
 
 .mj-create-clip:disabled {
 	pointer-events: none;
-	background: var(--color-theme-bg-subtle);
-	color: var(--color-theme-text-muted);
 }
 .mj-piano-roll {
 	display: block;
@@ -285,31 +471,237 @@ body {
 	overflow: hidden;
 }
 .mj-roll-lane {
-	fill: var(--polli-color-surface-opaque);
+	fill: var(--mj-live-display);
 }
 .mj-roll-lane-dark {
 	fill: color-mix(
 		in oklab,
-		var(--polli-color-text-muted) 5%,
-		var(--polli-color-surface-opaque)
+		var(--mj-live-displayLine) 20%,
+		var(--mj-live-display)
 	);
 }
 .mj-roll-key {
-	fill: var(--color-theme-text-muted);
+	fill: var(--mj-live-displayMuted);
 	opacity: 0.28;
 }
 .mj-roll-key-dark {
-	fill: var(--polli-color-surface-opaque);
+	fill: var(--mj-live-display);
 }
 .mj-roll-grid {
-	stroke: var(--color-theme-text-muted);
+	stroke: var(--mj-live-displayLine);
 	stroke-width: 0.5;
 	opacity: 0.14;
 }
 .mj-roll-note {
-	fill: color-mix(
-		in oklab,
-		var(--polli-color-text-soft) 80%,
-		var(--polli-color-text-strong)
+	fill: var(--mj-live-displayShape);
+}
+
+.mj-workspace {
+	position: relative;
+}
+.mj-workspace[data-compact="true"] .mj-chat-panel {
+	min-height: 0;
+	padding: 8px;
+	gap: 8px;
+	overflow: hidden;
+}
+.mj-compact-midi {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+}
+.mj-compact-preview {
+	height: 100%;
+	min-height: 0;
+}
+.mj-compact-preview[data-busy] {
+	opacity: 0.45;
+}
+.mj-empty-midi {
+	--mj-empty-fill: var(--mj-live-display);
+	--mj-empty-line: var(--mj-live-displayLine);
+	height: 100%;
+	border-radius: 8px;
+	background-color: var(--mj-empty-fill);
+	background-image:
+		linear-gradient(var(--mj-empty-line) 1px, transparent 1px),
+		linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--mj-empty-line) 60%, transparent) 1px,
+			transparent 1px
+		);
+	background-size:
+		100% 16px,
+		12.5% 100%;
+	box-shadow: inset 0 0 0 1px var(--mj-empty-line);
+}
+
+.mj-compact-status {
+	position: absolute;
+	left: 8px;
+	top: 8px;
+}
+.mj-workspace[data-compact="true"] .mj-composer {
+	padding: 12px 4px;
+	gap: 4px;
+}
+.mj-workspace[data-compact="true"] .mj-prompt {
+	height: 4.5rem;
+	min-height: 4.5rem;
+	max-height: 4.5rem;
+	padding-block: 0;
+}
+.mj-device-controls {
+	box-sizing: border-box;
+	width: 100%;
+	height: 100dvh;
+	padding: 8px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 4px;
+	overflow: auto;
+	font-size: 12px;
+}
+/* The native device is short; keep its controls legible and contained. */
+html:has(.mj-device-controls) {
+	font-size: 14px;
+}
+.mj-device-main {
+	display: flex;
+	flex: 1 0 auto;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+}
+.mj-device-open {
+	min-width: 140px;
+	min-height: 36px;
+	height: 36px;
+	padding: 4px 16px;
+	font-size: 16px;
+}
+.mj-device-footer {
+	margin-top: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	flex-shrink: 0;
+}
+.mj-device-footer .polli-link {
+	font-size: 12px;
+}
+.mj-device-balance {
+	flex-shrink: 0;
+	text-align: center;
+	line-height: 1.4;
+	color: var(--mj-live-muted);
+}
+.mj-device-balance > svg {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	margin-right: 4px;
+	vertical-align: -2px;
+}
+.mj-pollinations-connect {
+	position: relative;
+	width: auto;
+	max-width: 100%;
+	min-height: 40px;
+	height: 40px;
+	padding: 8px 12px;
+	gap: 8px;
+	font-size: var(--polli-text-base);
+}
+.mj-connect-label,
+.mj-cancel-label {
+	display: flex;
+	white-space: nowrap;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
+.mj-connect-label[aria-hidden="true"] {
+	visibility: hidden;
+}
+.mj-cancel-label {
+	position: absolute;
+	inset: 0;
+}
+
+.mj-midi-write {
+	position: relative;
+	display: block;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	overflow: hidden;
+	cursor: pointer;
+}
+.mj-midi-write[data-compact="true"] {
+	height: 100%;
+}
+.mj-assistant-reply > .mj-midi-write {
+	border-radius: 0;
+	border-bottom-left-radius: inherit;
+	border-bottom-right-radius: inherit;
+}
+.mj-assistant-reply > .mj-midi-write > .mj-piano-roll {
+	border-radius: 0;
+}
+.mj-midi-write::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border: 1px solid transparent;
+	border-radius: inherit;
+	pointer-events: none;
+}
+.mj-midi-write-label {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: var(--font-body);
+	font-size: var(--polli-text-sm);
+	font-weight: 500;
+	color: var(--mj-live-text);
+	background: color-mix(
+		in srgb,
+		var(--polli-color-surface-block) 70%,
+		transparent
 	);
+	opacity: 0;
+	pointer-events: none;
+}
+.mj-midi-write:enabled:is(:hover, :focus-visible) .mj-midi-write-label,
+.mj-midi-write[aria-busy="true"] .mj-midi-write-label {
+	opacity: 1;
+}
+.mj-midi-write:enabled:is(:hover, :focus-visible) .mj-piano-roll,
+.mj-midi-write[aria-busy="true"] .mj-piano-roll {
+	filter: blur(1px);
+}
+.mj-midi-write:enabled:is(:hover, :focus-visible)::after {
+	border-color: var(--mj-live-focus);
+}
+.mj-midi-write:focus-visible {
+	outline: none;
+}
+.mj-midi-write:enabled:active .mj-midi-write-label {
+	background: color-mix(in srgb, var(--polli-color-bg-hover) 85%, transparent);
+}
+.mj-midi-write:disabled {
+	cursor: default;
+}
+.mj-composer-notice {
+	font-size: var(--polli-text-xs);
 }

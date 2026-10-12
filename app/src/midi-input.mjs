@@ -5,6 +5,8 @@ import {
 	sanitizeInputNotes,
 } from "../.generated/midi-core.mjs";
 
+import { validMidiColor } from "./midi-color.mjs";
+
 export { MAX_SOURCE_CLIPS };
 
 export function midiInputKey(live) {
@@ -72,6 +74,7 @@ export function resolveMidiInput(live) {
 				? redactSecrets(source.title || "").slice(0, CONFIG.maxTitleLength)
 				: "",
 			noteCount: sanitizeInputNotes(source?.notes).length,
+			...(validMidiColor(source?.color) ? { color: source.color } : {}),
 		},
 	};
 }
@@ -109,5 +112,8 @@ export function normalizeMidiInput(value) {
 						typeof value.title === "string" ? value.title : "",
 					).slice(0, CONFIG.maxTitleLength),
 		noteCount: value.kind === "none" ? 0 : value.noteCount,
+		...(value.kind !== "none" && validMidiColor(value.color)
+			? { color: value.color }
+			: {}),
 	};
 }

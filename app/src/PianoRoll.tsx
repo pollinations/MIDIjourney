@@ -9,15 +9,17 @@ import type { MidiResult } from "./types";
 
 export const PianoRoll = memo(function PianoRoll({
 	clip,
+	compact = false,
 }: {
 	clip: MidiResult;
+	compact?: boolean;
 }) {
 	const roll = pianoRoll(clip.notes, clip.duration);
 	if (!roll) return null;
 	return (
 		<svg
 			className="mj-piano-roll"
-			style={{ height: roll.displayHeight }}
+			style={{ height: compact ? "100%" : roll.displayHeight }}
 			viewBox={`0 0 ${ROLL_WIDTH} ${ROLL_HEIGHT}`}
 			preserveAspectRatio="none"
 			role="img"

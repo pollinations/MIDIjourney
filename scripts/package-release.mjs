@@ -17,11 +17,11 @@ import { ROOT, sha256, verifyBuild, verifyFrozen } from "./release-lib.mjs";
 const candidate = process.argv[2];
 if (!candidate)
 	throw new Error(
-		'Usage: npm run release:package -- "/path/to/frozen/Midi Journey 2.amxd"',
+		'Usage: npm run release:package -- "/path/to/frozen/MIDI Journey 2.amxd"',
 	);
 const verified = await verifyFrozen(resolve(candidate));
 const manifest = await verifyBuild();
-const packageName = "Midi-Journey-2";
+const packageName = "MIDI-Journey-2";
 const releaseRoot = join(ROOT, "release");
 const destination = join(releaseRoot, packageName);
 const zipDestination = `${destination}.zip`;
@@ -51,7 +51,7 @@ const packages = execFileSync(
 // Tailwind is a build dependency, but its generated CSS ships in the device.
 packages.push(join(ROOT, "node_modules/tailwindcss"));
 const notices = [
-	"Midi Journey 2 — third-party notices\n\nIncludes licenses and notices for the installed production dependency closure and Tailwind CSS. Some modules may be removed by bundling. Font license texts follow the software notices.\n",
+	"MIDI Journey 2 — third-party notices\n\nIncludes licenses and notices for the installed production dependency closure and Tailwind CSS. Some modules may be removed by bundling. Font license texts follow the software notices.\n",
 ];
 for (const directory of packages) {
 	const pkg = JSON.parse(
@@ -87,6 +87,10 @@ for (const directory of packages) {
 		);
 	}
 }
+notices.push(
+	await readFile(join(ROOT, "device/native/MAX-SDK-LICENSE"), "utf8"),
+);
+
 const fontLicenses = join(ROOT, "node_modules/@pollinations/ui/dist/licenses");
 const fontFiles = (await readdir(fontLicenses))
 	.filter((file) => file.endsWith(".txt"))
@@ -102,18 +106,18 @@ const stage = await mkdtemp(join(releaseRoot, ".package-"));
 try {
 	const directory = join(stage, packageName);
 	await mkdir(directory);
-	await copyFile(resolve(candidate), join(directory, "Midi Journey 2.amxd"));
+	await copyFile(resolve(candidate), join(directory, "MIDI Journey 2.amxd"));
 	assert.equal(
-		sha256(await readFile(join(directory, "Midi Journey 2.amxd"))),
+		sha256(await readFile(join(directory, "MIDI Journey 2.amxd"))),
 		verified.sha256,
 	);
 	await copyFile(join(ROOT, "LICENSE"), join(directory, "LICENSE"));
 	await writeFile(join(directory, "THIRD-PARTY-NOTICES.txt"), notices.join(""));
 	await writeFile(
 		join(directory, "README.md"),
-		`# Midi Journey 2 V${verified.version}
+		`# MIDI Journey 2 V${verified.version}
 
-Prepared release candidate — not published. Local acceptance is complete, with remaining manual checks confirmed by the maintainer on October 11, 2026. Publication requires separate approval.
+Generate and transform MIDI in Ableton Live with [Pollinations.ai](https://pollinations.ai/). Connect your own account; generation uses your Pollen balance.
 
 ## Requirements
 
@@ -123,17 +127,19 @@ Prepared release candidate — not published. Local acceptance is complete, with
 
 ## Install and use
 
-1. Unzip this folder and drag **Midi Journey 2.amxd** onto **Main** in Live.
-2. Click its OPEN/CLOSE label to open or close the editor.
-3. Click **Connect**, sign in through your system browser, confirm your account, and return to Live.
-4. Describe a musical idea. Select a MIDI clip to include its notes as input.
-5. Select a Session MIDI clip or an empty MIDI slot, then click **Create clip**.
+1. Unzip this folder and drag **MIDI Journey 2.amxd** onto **Main** in Live.
+2. Click **Open chat** in the device. The device and chat automatically follow Live's appearance.
+3. Click **Connect**, authorize through Pollinations in your system browser, and return to Live. The connection completes automatically.
+4. Describe a musical idea. Select a MIDI clip to include its notes as input. Your avatar opens the Pollinations dashboard; the Pollen amount opens this app's key management.
+5. Select a Session MIDI clip or an empty MIDI slot, then click a generated **MIDI preview**.
 
 **Creating replaces the selected existing clip's notes, title and length, or fills the selected empty slot.** Other clips remain unchanged. Test with disposable clips first. Recording clips and Arrangement destinations cannot be written.
 
-All runtime scripts, web assets, fonts and artwork are embedded. No separate Node installation or source checkout is needed. Stop any development preview before loading the device.
+All runtime scripts, web assets and fonts are embedded. No separate Node installation or source checkout is needed. Stop any development preview before loading the device.
 
-Hiding/reopening preserves the current conversation. New chat clears it; removing/reloading the device starts fresh. Your own login may remain saved locally. Right-click provides Copy/Paste.
+Each new device load starts with an empty conversation and text field. No chat history, generated clips, drafts or personal login credentials are included in this download. Your own login may remain saved locally on your computer.
+
+Hiding/reopening preserves the current conversation. Trash beside Send clears it; removing/reloading the device starts fresh. Command-C/V/X/A and Command-Z/Shift-Z provide normal text editing inside the editor. Right-click editing also remains available. The floating editor stays visible when Live loses focus. Resize the editor directly: below 520 px of content height it shows the latest MIDI and a three-line prompt; taller windows show the conversation and six prompt lines. New devices start at 420 × 550; reopening preserves size and position. Width is limited to 420–720 px. Connect or your account sits on the left above the text-only border; the clip-colored MIDI badge, Send, and Trash sit on the right. Trash shows the generated clip count and is disabled when that count is zero.
 
 The welcome and recognized exact single-clip transpositions run locally. Other requests use your Pollinations balance and may involve agent tool calls. Paid requests are not retried automatically.
 
@@ -143,19 +149,21 @@ The device uses the existing hosted D1 prompt-based MIDIjourney agent and its Po
 
 Send shares your message, selected MIDI notes/basic metadata, and bounded recent conversation with Pollinations and its model providers. It does not send audio or your entire Live Set. Chat stays in memory. Sign-in sessions are managed locally by the Pollinations SDK; signing out in Live and the system browser are separate actions.
 
-For a blank editor, select bundled Max in Live's settings and restart Live. If the port is busy, close other device instances or the development preview. Hover disabled Send/Create clip buttons for guidance. After a write timeout, inspect the clip before retrying; use Live Undo if necessary.
+For a blank editor, select bundled Max in Live's settings and restart Live. If the port is busy, close other device instances or the development preview. Connect before sending; select a Session MIDI slot before writing. After a write timeout, inspect the clip before retrying; use Live Undo if necessary.
+
+The native macOS component is ad-hoc signed without Developer ID signing or notarization. macOS may block it after download. Do not disable Gatekeeper to load the device.
 
 When reporting a problem, include macOS/Live/Max versions and the device checksum below. Do not include login tokens or OAuth callback URLs.
 
 ## Artifact verification
 
-The native container, patch connections, runtime scripts and artwork match the current source build. This is byte verification, not completion of native Ableton acceptance.
+The native container, patch connections, runtime scripts and web controls match the current source build. This is byte verification, not completion of native Ableton acceptance.
 
 - Device SHA-256: \`${verified.sha256}\`
 - Build source fingerprint: \`${manifest.source}\`
 - Version: ${verified.version}
 
-Run \`shasum -a 256 -c SHA256SUMS\` inside this folder to verify every packaged file. The release source commit and native acceptance record must be finalized before publication.
+Run \`shasum -a 256 -c SHA256SUMS\` inside this folder to verify every packaged file. See the GitHub release and repository release checklist for the source revision and acceptance record.
 
 See LICENSE and THIRD-PARTY-NOTICES.txt for copyright and license notices.
 `,

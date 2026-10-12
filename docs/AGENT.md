@@ -1,6 +1,6 @@
-# Hosted Midi Journey agent
+# Hosted MIDI Journey 2 agent
 
-Midi Journey 2 calls `community/pollinations-ai/midijourney` through the
+MIDI Journey 2 calls `community/pollinations-ai/midijourney` through the
 Pollinations SDK. The existing D1 prompt-based agent remains the source of
 truth for its prompt, base model and enabled MCP tools. This repository does
 not upload a replacement agent or update the production prompt.
@@ -18,11 +18,11 @@ promise about every future hosted configuration.
 ## Device behavior and spending
 
 The app sends no system prompt. It validates returned MIDI before enabling
-Create clip; errors and prose never become clip writes. Fresh selected MIDI
+clicking a MIDI preview; errors and prose never become clip writes. Fresh selected MIDI
 and bounded recent conversation provide context.
 
 Recognized exact single-clip transpositions run locally and still require
-Create clip. Other messages make one SDK request without automatic paid
+clicking a MIDI preview. Other messages make one SDK request without automatic paid
 retries; the hosted agent may make several model/tool calls within that request.
 Cancellation cannot undo upstream spending. Keys and budgets are unchanged.
 

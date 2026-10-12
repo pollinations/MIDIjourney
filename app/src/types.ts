@@ -71,11 +71,12 @@ export type MidiInputSummary = {
 	kind: "live" | "reply" | "none";
 	title: string;
 	noteCount: number;
+	color?: number;
 };
 export type MidiAttachment = {
 	key: string;
 	summary: MidiInputSummary;
-	source: { title: string; duration: number; notes: Note[] };
+	source: { title: string; duration: number; notes: Note[]; color?: number };
 };
 export type ChatState = {
 	draft: string;
@@ -86,11 +87,17 @@ export type ChatState = {
 };
 export type LiveContext = {
 	connected: boolean;
+	clipId?: number;
 	checking?: boolean;
 	target?: string;
 	destination?: string;
 	sourceId?: string;
-	source?: { title: string; duration: number; notes: Note[] } | null;
+	source?: {
+		title: string;
+		duration: number;
+		notes: Note[];
+		color?: number;
+	} | null;
 	sourceError?: string;
 	error?: string;
 };

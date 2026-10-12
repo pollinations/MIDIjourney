@@ -5,105 +5,47 @@ import test from "node:test";
 import vm from "node:vm";
 import { makeDevice } from "../../scripts/device.mjs";
 
-test("native device artwork follows actual window visibility and Pollinations login independently", async () => {
+test("device controls open the existing editor without reloading its web page", async () => {
 	const { patcher } = makeDevice();
 	const boxes = new Map(patcher.boxes.map(({ box }) => [box.id, box]));
-	assert.equal(patcher.devicewidth, 169);
-	assert.deepEqual(boxes.get("artwork").presentation_rect, [0, 0, 169, 169]);
-	assert.equal(boxes.get("artwork").pic, "midijourney-open-disconnected.png");
-	assert.equal(boxes.get("artwork").autofit, 1);
-	assert.equal(boxes.get("artwork").ignoreclick, 1);
-	assert.deepEqual(boxes.get("open").presentation_rect, [27, 124, 112, 33]);
-	assert.deepEqual(boxes.get("open").bgcolor, [0, 0, 0, 0]);
-	assert.equal(boxes.get("open").mode, 0);
-	assert.equal(boxes.has("led"), false);
-	assert.equal(boxes.has("retry"), false);
-	assert.equal(boxes.has("label"), false);
-	const values = [];
+	assert.equal(patcher.devicewidth, 200);
+	assert.deepEqual(boxes.get("controls").presentation_rect, [0, 0, 200, 169]);
+	assert.equal(boxes.has("artwork"), false);
+	assert.equal(boxes.has("auth-state"), false);
 	const commands = [];
-	const wind = { visible: false };
-	const tasks = [];
 	const context = {
-		Task: class {
-			constructor(fn, host) {
-				this.fn = () => fn.call(host);
-				tasks.push(this);
-			}
-			repeat() {
-				this.fn();
-			}
-			cancel() {
-				this.cancelled = true;
-			}
-		},
-		outlet(index, command) {
-			assert.equal(index, 0);
-			commands.push(command);
-			wind.visible = command === "open";
-		},
-		patcher: {
-			getnamed(name) {
-				if (name === "editor") return { subpatcher: () => ({ wind }) };
-				assert.equal(name, "device-artwork");
-				return { message: (...args) => values.push(args) };
-			},
-		},
+		outlet: (_index, command) => commands.push(command),
 	};
 	vm.createContext(context);
 	vm.runInContext(
 		await readFile(new URL("../../device/panel.js", import.meta.url), "utf8"),
 		context,
 	);
-	context.init();
-	context.ready(); // A running server must not claim a Pollinations login.
-	context.refresh();
-	assert.equal(values.length, 1, "unchanged state does not reload artwork");
-	context.auth(1);
-	context.toggle();
-	context.refresh();
-	context.auth(0);
-	context.toggle();
-	context.refresh();
-	assert.deepEqual(values, [
-		["pic", "midijourney-open-disconnected.png"],
-		["pic", "midijourney-open-connected.png"],
-		["pic", "midijourney-close-connected.png"],
-		["pic", "midijourney-close-disconnected.png"],
-		["pic", "midijourney-open-disconnected.png"],
-	]);
-	assert.deepEqual(commands, ["open", "close"]);
-	context.show();
-	context.auth(1);
-	wind.visible = false; // Native title-bar close, not our button.
-	tasks[0].fn();
-	assert.deepEqual(values.at(-1), ["pic", "midijourney-open-connected.png"]);
-	context.unavailable();
-	assert.deepEqual(values.at(-1), ["pic", "midijourney-open-disconnected.png"]);
-	context.init();
-	assert.equal(tasks[0].cancelled, true);
-	context.notifydeleted();
-	assert.equal(tasks[1].cancelled, true);
-	assert.equal(boxes.get("auth-route").text, "route pollinations");
-	assert.ok(
-		patcher.lines.some(
-			({ patchline: l }) =>
-				l.source[0] === "auth-state" && l.destination[0] === "panel",
+	context.editor("show");
+	context.editor("expanded");
+	context.editor("compact");
+	context.editor("state");
+	context.editor("invalid");
+	assert.deepEqual(commands, ["open"]);
+	const editor = boxes.get("window").patcher;
+	assert.equal(
+		editor.lines.some(
+			({ patchline: line }) =>
+				line.source[0] === "shortcuts" && line.destination[0] === "web",
 		),
+		false,
 	);
-	const server = await readFile(
-		new URL("../../device/server.mjs", import.meta.url),
-		"utf8",
-	);
-	assert.match(server, /if \(server\) return;/);
-	assert.ok(
-		patcher.lines.some(
-			({ patchline: l }) =>
-				l.source[0] === "open" && l.destination[0] === "start",
-		),
-	);
+	for (const source of ["defer", "controls"]) {
+		assert.ok(
+			patcher.lines.some(
+				({ patchline: l }) =>
+					l.source[0] === source && l.destination[0] === "controls-route",
+			),
+		);
+	}
 });
 
-test("composer contains its action and reserves text space; explanations use compact leading", async () => {
+test("composer toolbar precedes the text-only field; explanations use compact leading", async () => {
 	const workspace = await readFile(
 		new URL("../src/Workspace.tsx", import.meta.url),
 		"utf8",
@@ -114,15 +56,15 @@ test("composer contains its action and reserves text space; explanations use com
 	);
 	assert.match(
 		workspace,
-		/<Field.Root[^>]*mj-composer[\s\S]*mj-composer-action[\s\S]*Send[\s\S]*<\/Field.Root>/,
+		/mj-composer-toolbar[\s\S]*sendButton[\s\S]*<Field.Root[^>]*mj-composer[\s\S]*<Textarea[\s\S]*<\/Field.Root>/,
 	);
 	assert.doesNotMatch(workspace, /PromptClipboard/);
 	assert.doesNotMatch(styles, /\.mj-prompt\s*\{[^}]*padding-right:/);
-	assert.match(styles, /\.mj-composer\s*\{[^}]*padding-bottom: 3rem;/);
-	assert.match(styles, /\.mj-send\s*\{[^}]*border-radius: 50%;/);
+	assert.match(styles, /\.mj-composer\s*\{[^}]*padding: 4px;/);
+	assert.match(styles, /\.mj-round\s*\{[^}]*border-radius: 50%;/);
 	assert.match(workspace, /aria-label="Send"/);
 	assert.match(workspace, /<ArrowRightIcon aria-hidden="true"/);
-	assert.match(styles, /\.mj-composer-action\s*\{[^}]*position: absolute;/);
+	assert.match(styles, /\.mj-composer-toolbar\s*\{[^}]*display: flex;/);
 	assert.match(styles, /\.mj-reply-explanation\s*\{[^}]*line-height: 1\.4;/);
 });
 
@@ -143,16 +85,17 @@ test("new device has stereo pass-through and an independent modeless web window"
 		);
 	}
 	const window = boxes.get("window").patcher;
-	assert.equal(window.title, "Midi Journey 2");
+	assert.equal(window.title, "MIDI Journey 2");
 	const web = window.boxes.find(({ box }) => box.id === "web").box;
 	assert.equal(web.maxclass, "jweb");
 	assert.equal(web.presentation, 1);
 	const flags = window.boxes.find(({ box }) => box.id === "config").box.text;
 	assert.match(flags, /window flags grow/);
+	assert.match(flags, /window constrain 420 324 720 1400/);
 	assert.match(flags, /window flags float/);
-	assert.match(flags, /window size 180 80 720 900/);
-	assert.deepEqual(window.rect, [180, 80, 540, 820]);
-	assert.deepEqual(web.presentation_rect, [0, 0, 540, 820]);
+	assert.match(flags, /window size 180 80 600 630/);
+	assert.deepEqual(window.rect, [180, 80, 420, 550]);
+	assert.deepEqual(web.presentation_rect, [0, 0, 420, 550]);
 	assert.doesNotMatch(
 		JSON.stringify(patcher),
 		/close_and_send|mj_bp_|mj_nodeJS/,
@@ -171,15 +114,15 @@ test("workspace omits destination and success messages but keeps creation valida
 	assert.match(workspace, /clipCreationUnavailable\(live\)/);
 	assert.match(workspace, /unavailableReason=\{creationUnavailable\}/);
 	const footer = await readFile(
-		new URL("../src/ReplyFooter.tsx", import.meta.url),
+		new URL("../src/MidiClipButton.tsx", import.meta.url),
 		"utf8",
 	);
 	assert.doesNotMatch(footer, /turn\.notice/);
-	assert.match(footer, /\{turn\.writeError\}/);
+	assert.match(workspace, /clipWriteFeedback\(turn\.writeError\)/);
 	assert.match(footer, /unavailableReason \|\|/);
-	assert.match(footer, /disabledReason \? \(\s*<Tooltip/);
-	assert.match(footer, /content=\{disabledReason\}/);
-	assert.match(footer, /triggerAs="span"\s+tapEnabled/);
+	assert.doesNotMatch(footer, /Tooltip|PlusIcon/);
+	assert.match(footer, /aria-description=/);
+	assert.match(footer, /<PianoRoll/);
 	assert.match(footer, /disabled=\{Boolean\(disabledReason\)\}/);
 	assert.doesNotMatch(
 		footer,
@@ -206,12 +149,12 @@ test("conversation uses the shared scrollbar, quiet response titles, and a non-r
 	assert.match(styles, /\.mj-prompt\s*\{[^}]*resize: none;/);
 	assert.match(
 		styles,
-		/\.mj-composer\s*\{[^}]*border: 1px dotted var\(--color-theme-border\);/,
+		/\.mj-composer\s*\{[^}]*border: 1px solid var\(--mj-live-muted\);/,
 	);
 	assert.match(styles, /\.mj-composer\s*\{[^}]*background: transparent;/);
 	assert.match(
 		styles,
-		/\.mj-composer:focus-within\s*\{[^}]*border-color: var\(--color-theme-text-soft\);/,
+		/\.mj-composer:focus-within\s*\{[^}]*border-color: var\(--mj-live-focus\);/,
 	);
 	assert.doesNotMatch(styles, /\.mj-composer:focus-within\s*\{[^}]*outline:/);
 	assert.match(
@@ -222,7 +165,7 @@ test("conversation uses the shared scrollbar, quiet response titles, and a non-r
 
 test("chat cards remain distinct and compact without response copy controls", async () => {
 	const [workspace, styles, footer] = await Promise.all(
-		["Workspace.tsx", "style.css", "ReplyFooter.tsx"].map((filename) =>
+		["Workspace.tsx", "style.css", "MidiClipButton.tsx"].map((filename) =>
 			readFile(new URL(`../src/${filename}`, import.meta.url), "utf8"),
 		),
 	);
@@ -247,7 +190,7 @@ test("chat cards remain distinct and compact without response copy controls", as
 	assert.match(styles, /\.mj-piano-roll\s*\{[^}]*height: 112px;/);
 	assert.match(
 		styles,
-		/\.mj-roll-note\s*\{[^}]*var\(--polli-color-text-soft\) 80%/,
+		/\.mj-roll-note\s*\{[^}]*fill: var\(--mj-live-displayShape\)/,
 	);
 	assert.match(workspace, /mj-user-message [^"]*px-3 py-2/);
 });
@@ -273,15 +216,16 @@ test("MIDI badges are single-line and passive elements have no native tooltips",
 	const components = await Promise.all(
 		[
 			"Workspace.tsx",
-			"ReplyFooter.tsx",
+			"MidiClipButton.tsx",
 			"PianoRoll.tsx",
 			"MidiInputFeedback.tsx",
+			"CompactMidi.tsx",
 		].map((filename) =>
 			readFile(new URL(`../src/${filename}`, import.meta.url), "utf8"),
 		),
 	);
 	for (const component of components) {
-		assert.doesNotMatch(component, /\stitle=|<title[\s>]/);
+		assert.doesNotMatch(component, /\stitle=|<title[\s>]|Tooltip/);
 	}
 	const badge = components[3].slice(
 		components[3].indexOf("function MidiBadge"),
@@ -291,7 +235,7 @@ test("MIDI badges are single-line and passive elements have no native tooltips",
 	assert.match(components[2], /aria-label=/);
 });
 
-test("connection guidance is confined to the focusable disabled Send tooltip", async () => {
+test("connection guidance is accessible without hover tooltips", async () => {
 	const [workspace, account, app, styles] = await Promise.all(
 		["Workspace.tsx", "LiveAccount.tsx", "App.tsx", "style.css"].map((name) =>
 			readFile(new URL(`../src/${name}`, import.meta.url), "utf8"),
@@ -304,17 +248,18 @@ test("connection guidance is confined to the focusable disabled Send tooltip", a
 	const compactWorkspace = workspace.replace(/\s+/g, " ");
 	assert.match(
 		compactWorkspace,
-		/<Tooltip triggerAs="span" tapEnabled ariaLabel="Why Send is unavailable"/,
+		/loggedIn && chat.busyId \? .*: \( sendButton \)\}/,
 	);
-	assert.match(
-		compactWorkspace,
-		/content=\{\s*connecting \? "Finish connecting in your browser\." : "Connect to Pollinations first\."\s*\}/,
-	);
+	assert.match(workspace, /\{connectControl\}/);
+	assert.match(workspace, /disabled=\{\s*!loggedIn/);
 	assert.doesNotMatch(account, /Finish connecting in your browser/);
-	assert.match(account, /aria-label="Cancel connection"/);
+	assert.match(
+		account,
+		/aria-label=\{pending \? "Cancel connection" : "Connect to Pollinations"\}/,
+	);
 	assert.match(account, /mj-auth-spinner/);
-	assert.match(app, /pending=\{connecting\}/);
-	assert.match(app, /connecting=\{connecting\}/);
+	assert.match(account, /pending,/);
+	assert.match(app, /onPendingChange=\{setConnecting\}/);
 	assert.match(styles, /prefers-reduced-motion: reduce/);
 });
 
@@ -329,41 +274,29 @@ test("MIDI response cards have a comfortable maximum width without fixing their 
 	assert.doesNotMatch(reply, /(?:^|[;\s])(?:width|min-width):/);
 });
 
-test("compact header contains only new chat, account and shared color mode controls", async () => {
-	const [app, workspace, styles] = await Promise.all(
-		["App.tsx", "Workspace.tsx", "style.css"].map((filename) =>
-			readFile(new URL(`../src/${filename}`, import.meta.url), "utf8"),
-		),
+test("headerless conversation has account controls first, Reset last and chat-owned login", async () => {
+	const workspace = await readFile(
+		new URL("../src/Workspace.tsx", import.meta.url),
+		"utf8",
 	);
-	assert.match(
-		workspace,
-		/<main[\s\S]*<Surface\s+role="region"\s+variant="panel"\s+className="mj-chat-panel [^"]*"[\s\S]*<ScrollArea[\s\S]*<\/ScrollArea>\s*<form[\s\S]*<\/form>[\s\S]*<\/Surface>/,
-	);
-	const header = workspace.match(/<header\b[\s\S]*?<\/header>/)?.[0];
-	assert.ok(header);
-	assert.match(
-		header,
-		/onClick=\{fresh\}[\s\S]*disabled=\{Boolean\(chat.sendingId\)\}[\s\S]*New chat[\s\S]*\{account\}[\s\S]*<ColorModeToggle \/>/,
-	);
-	assert.equal((workspace.match(/New chat/g) || []).length, 1);
-	assert.doesNotMatch(header, /<Heading|<img|Midi Journey 2/);
-	assert.match(app, /account=\{\s*<LiveAccount/);
-	assert.match(
-		workspace,
-		/function fresh\(\) \{\s*follow.current = true;\s*onNewChat\(\);\s*composer.current\?\.focus\(\);/,
+	const panel = await readFile(
+		new URL("../src/DevicePanel.tsx", import.meta.url),
+		"utf8",
 	);
 	assert.doesNotMatch(
-		app + workspace + styles,
-		/HeaderScene|ChatBottomScene|mj-header-scene|mj-chat-bottom-scene|mj-chat-top-scene/,
-	);
-	assert.match(styles, /\.mj-chat-panel\s*\{[^}]*overflow-y: auto;/);
-	assert.match(
-		styles,
-		/\.mj-new-chat\s*\{[^}]*min-height: 2rem;[^}]*font-size: 0\.75rem;/,
+		workspace,
+		/<header|ColorModeToggle|New chat|\{account\}/,
 	);
 	assert.match(
-		styles,
-		/@media \(max-width: 319px\)[\s\S]*?\.mj-header\s*\{\s*flex-direction: column-reverse;/,
+		workspace,
+		/mj-composer-toolbar[\s\S]*\{accountControl\}[\s\S]*\{connectControl\}[\s\S]*sendButton[\s\S]*Reset conversation[\s\S]*TrashIcon[\s\S]*mj-reset-count/,
+	);
+	assert.doesNotMatch(panel, /<LiveAccount/);
+	assert.doesNotMatch(panel, /ColorModeToggle/);
+	assert.doesNotMatch(panel, /Compact|Expanded/);
+	assert.doesNotMatch(
+		workspace,
+		/WindowToggle|Expand conversation|Collapse to MIDI/,
 	);
 });
 
@@ -382,14 +315,14 @@ test("V3 uses native clipboard menus without a custom OS clipboard bridge", asyn
 	const { patcher } = makeDevice(resolve("dist"));
 	assert.equal(
 		patcher.boxes.find(({ box }) => box.id === "route").box.text,
-		"route uiurl panel",
+		"route uiurl controlsurl",
 	);
 	assert.ok(
 		patcher.lines.some(
 			({ patchline }) =>
 				patchline.source[0] === "route" &&
 				patchline.source[1] === 1 &&
-				patchline.destination[0] === "panel",
+				patchline.destination[0] === "controls-read",
 		),
 	);
 });
@@ -407,8 +340,8 @@ test("the welcome remains before all exchanges without an API call or response c
 		.replace(/\s+/g, " ");
 	assert.match(welcome, /className="mj-assistant-reply /);
 	assert.doesNotMatch(workspace, /!chat\.turns\.length\s*\?/);
-	assert.match(welcome, /aria-label="Welcome from Midi Journey 2"/);
-	assert.match(welcome, /🎹 Hi, I’m Midi Journey 2\./);
+	assert.match(welcome, /aria-label="MIDI generation introduction"/);
+	assert.match(welcome, /Generative MIDI clips/);
 	assert.match(welcome, /<ul className="list-disc space-y-1 pl-4">/);
 	assert.equal((welcome.match(/<li>/g) || []).length, 3);
 	assert.match(
@@ -417,12 +350,12 @@ test("the welcome remains before all exchanges without an API call or response c
 	);
 	assert.match(
 		welcome,
-		/<strong>Create clip<\/strong> fills an empty slot or replaces the selected clip\./,
+		/<strong>Click a MIDI preview<\/strong> to write it to the selected slot or replace the selected clip\./,
 	);
 	assert.doesNotMatch(welcome, /clips stay intact/);
 	assert.doesNotMatch(
 		welcome,
-		/<Heading|ReplyFooter|CopyDetails|onGenerate|fetch\(/,
+		/🎹|Hi, I’m|ReplyFooter|CopyDetails|onGenerate|fetch\(/,
 	);
 	assert.doesNotMatch(
 		workspace,
@@ -430,7 +363,7 @@ test("the welcome remains before all exchanges without an API call or response c
 	);
 });
 
-test("production chat starts fresh with no browser persistence callback", async () => {
+test("production chat starts fresh without browser persistence", async () => {
 	const app = await readFile(
 		new URL("../src/App.tsx", import.meta.url),
 		"utf8",
@@ -438,7 +371,7 @@ test("production chat starts fresh with no browser persistence callback", async 
 	assert.match(app, /initial: freshChat\(\)/);
 	assert.doesNotMatch(
 		app,
-		/loadChat|saveChat|browserStorage|localStorage|save:/,
+		/loadChat|saveChat|browserStorage|localStorage|sessionStorage/,
 	);
 });
 
@@ -448,8 +381,8 @@ test("header, notices, and chat share the 30-percent narrower app limit", async 
 			readFile(new URL(`../src/${filename}`, import.meta.url), "utf8"),
 		),
 	);
-	assert.equal((workspace.match(/className="mj-app-width /g) || []).length, 3);
-	assert.match(workspace, /<main className="mj-app-width /);
+	assert.equal((workspace.match(/className="mj-app-width /g) || []).length, 2);
+	assert.match(workspace, /<main\s+className="mj-app-width /);
 	assert.doesNotMatch(app + workspace, /max-w-5xl/);
 	assert.match(styles, /\.mj-app-width\s*\{\s*max-width: 44\.8rem;/);
 });
@@ -460,7 +393,7 @@ test("document title keeps the app name without a visible header title", async (
 		readFile(new URL("../index.html", import.meta.url), "utf8"),
 	]);
 	assert.doesNotMatch(app, /<Heading|<HeaderScene/);
-	assert.match(html, /<title>Midi Journey 2 \| pollinations\.ai<\/title>/);
+	assert.match(html, /<title>MIDI Journey 2 \| pollinations\.ai<\/title>/);
 });
 
 test("production device is independent of the checkout and exposes only minimal controls", () => {
@@ -479,7 +412,6 @@ test("production device is independent of the checkout and exposes only minimal 
 		patcher.boxes
 			.filter(({ box }) => box.presentation)
 			.map(({ box }) => box.id),
-		["artwork", "open"],
+		["controls"],
 	);
-	assert.equal(patcher.boxes.find(({ box }) => box.id === "open").box.text, "");
 });

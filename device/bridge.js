@@ -215,6 +215,22 @@ function selectedSource(view, fresh) {
 		}
 		cacheKey = String(sourceId);
 	}
+	// Color is cheap UI metadata: refresh it without rereading cached notes.
+	if (sourceCache && sourceId) {
+		try {
+			var color = scalar(byId(sourceId), "color");
+			if (
+				typeof color === "number" &&
+				color === Math.floor(color) &&
+				color >= 0 &&
+				color <= 0xffffff
+			)
+				sourceCache.color = color;
+			else delete sourceCache.color;
+		} catch (_) {
+			delete sourceCache.color;
+		}
+	}
 	return { sourceId: sourceCache ? String(sourceId) : "", source: sourceCache };
 }
 function destination(view) {
@@ -429,7 +445,7 @@ function create(id, raw) {
 		target = destination(api("live_set view"));
 		if (request.target !== target.target)
 			throw new Error(
-				"The selection changed. Check the destination and click Create clip again."
+				"The selection changed. Check the destination and click the MIDI preview again."
 			);
 		// Revalidate both occupancy and identity before the first mutation.
 		var slot = byId(target.slotId);
@@ -456,7 +472,7 @@ function create(id, raw) {
 			writeDictionary.freepeer();
 			writeDictionary = null;
 		}
-		if (!value.ok) post("MIDI Journey: " + value.error + "\n");
+		if (!value.ok) post("MIDI Journey 2: " + value.error + "\n");
 		writing = false;
 		cacheKey = "";
 		remember(id, value);

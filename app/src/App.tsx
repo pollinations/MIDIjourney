@@ -1,27 +1,18 @@
 import { Pollinations } from "@pollinations/sdk";
 import { useAuthActions, useAuthState } from "@pollinations/sdk/react";
 import { Alert } from "@pollinations/ui";
-import {
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-	useSyncExternalStore,
-} from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
 	CONFIG,
 	PollinationsMidiClient,
 	redactSecrets,
 } from "../.generated/midi-core.mjs";
+import { ChatAccount } from "./ChatAccount";
 import { observeChat } from "./call-log.mjs";
 import { createChatSession } from "./chat-session.mjs";
-import {
-	currentContext,
-	isJweb,
-	reportPollinationsConnection,
-	subscribeContext,
-} from "./jweb.mjs";
+import { currentContext, isJweb, subscribeContext } from "./jweb.mjs";
 import { LiveAccount } from "./LiveAccount";
+
 import { freshChat, sendClipToLive } from "./session.mjs";
 import type { CallEntry, ChatState, LiveContext } from "./types";
 import { Workspace } from "./Workspace";
@@ -30,20 +21,18 @@ export function App() {
 	const { apiKey, isLoggedIn, error: authError } = useAuthState();
 	const { logout } = useAuthActions();
 	const callId = useRef(0);
+	// Keep one in-memory conversation across disconnects and reconnects.
+	const auth = useRef<{ client: Pollinations | null; logout: typeof logout }>({
+		client: null,
+		logout,
+	});
 	const [connecting, setConnecting] = useState(false);
-	const [connectionError, setConnectionError] = useState("");
+	const [connectError, setConnectError] = useState("");
 	const [live, setLive] = useState<LiveContext>({
 		connected: false,
 		checking: true,
 	});
-	const session = useMemo(() => {
-		const client = apiKey
-			? new Pollinations({
-					apiKey,
-					baseUrl: CONFIG.agentBaseUrl,
-					textTimeout: CONFIG.textTimeoutMs,
-				})
-			: null;
+	const [session] = useState(() => {
 		return createChatSession({
 			initial: freshChat(),
 			readContext: async () => {
@@ -58,6 +47,7 @@ export function App() {
 			writeClip: (result: unknown, target: string) =>
 				sendClipToLive(window, result, target),
 			createGenerator: (onCall: (entry: CallEntry) => void) => {
+				const { client, logout } = auth.current;
 				if (!client) throw new Error("Connect to Pollinations first.");
 				const observed = observeChat(client, onCall, () => ++callId.current);
 				return new PollinationsMidiClient({
@@ -65,7 +55,22 @@ export function App() {
 				});
 			},
 		});
-	}, [apiKey, logout]);
+	});
+	useEffect(() => {
+		// Cancel work authorized by the previous connection without discarding
+		// completed MIDI, the draft, or any pending Live-write guard.
+		session.cancel();
+		auth.current = {
+			client: apiKey
+				? new Pollinations({
+						apiKey,
+						baseUrl: CONFIG.agentBaseUrl,
+						textTimeout: CONFIG.textTimeoutMs,
+					})
+				: null,
+			logout,
+		};
+	}, [apiKey, logout, session]);
 	const chat = useSyncExternalStore(
 		session.subscribe,
 		session.getSnapshot,
@@ -75,53 +80,31 @@ export function App() {
 		return () => session.dispose();
 	}, [session]);
 	useEffect(() => subscribeContext(window, setLive), []);
-	useEffect(
-		() => reportPollinationsConnection(window, isLoggedIn && Boolean(apiKey)),
-		[isLoggedIn, apiKey],
-	);
-	useEffect(() => {
-		if (!isJweb(window)) return;
-		const openExternal = (event: MouseEvent) => {
-			const anchor = (event.target as Element)?.closest?.("a[href]");
-			if (!anchor) return;
-			const url = new URL(anchor.getAttribute("href") || "", location.href);
-			if (url.origin === "https://enter.pollinations.ai") {
-				event.preventDefault();
-				(
-					window as unknown as { max: { outlet: (message: string) => void } }
-				).max.outlet("dashboard");
-			}
-		};
-		document.addEventListener("click", openExternal, true);
-		return () => document.removeEventListener("click", openExternal, true);
-	}, []);
+
 	return (
 		<div
-			data-theme="blue"
+			data-theme="live"
 			className="mj-app flex h-dvh flex-col text-sm text-theme-text-base"
 		>
 			<Workspace
-				account={
-					<LiveAccount
-						pending={connecting}
-						onPendingChange={setConnecting}
-						onError={setConnectionError}
-						revision={
-							chat.turns.filter((turn) => turn.status === "complete").length
-						}
-					/>
-				}
 				notice={
-					connectionError || authError ? (
+					authError || connectError ? (
 						<Alert intent="danger">
-							{redactSecrets(connectionError || authError?.message || "")}
+							{redactSecrets(connectError || authError?.message || "")}
 						</Alert>
 					) : null
 				}
 				chat={chat}
 				live={live}
 				loggedIn={isLoggedIn}
-				connecting={connecting}
+				accountControl={<ChatAccount busy={Boolean(chat.busyId)} />}
+				connectControl={
+					<LiveAccount
+						pending={connecting}
+						onPendingChange={setConnecting}
+						onError={setConnectError}
+					/>
+				}
 				onPrompt={session.setDraft}
 				onGenerate={() => void session.generate()}
 				onCancel={session.cancel}

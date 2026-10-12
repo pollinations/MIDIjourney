@@ -1,9 +1,14 @@
 import { AudioIcon, Surface, Text } from "@pollinations/ui";
+import { midiBadgeStyle } from "./midi-color.mjs";
 import type { MidiAttachment, MidiInputSummary } from "./types";
 
 function MidiBadge({ summary }: { summary: MidiInputSummary }) {
 	return (
-		<Surface variant="card" className="mj-midi-badge">
+		<Surface
+			variant="card"
+			className="mj-midi-badge"
+			style={midiBadgeStyle(summary.color)}
+		>
 			<AudioIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
 			<Text as="span" size="xs" weight="medium" className="min-w-0 truncate">
 				{`${(summary.title || "Untitled MIDI clip").replace(/\.midi?$/i, "")}.midi`}

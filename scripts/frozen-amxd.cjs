@@ -451,7 +451,7 @@ function parseNativeDirectoryRecord(buffer, offset, limit) {
     }
     childOffset = childEnd;
   }
-  if (childOffset !== end || !["JSON", "TEXT", "PNG ", "fold"].includes(fields.type)) {
+  if (childOffset !== end || !["JSON", "TEXT", "PNG ", "fold", "iLaX", "\0\0\0\0"].includes(fields.type)) {
     throw new Error("Frozen AMXD native dependency directory has unexpected record data");
   }
   return { ...fields, end };
@@ -644,7 +644,9 @@ function inspectFrozenAmxd(buffer, options) {
 }
 
 function inspectDirectDependencies(buffer, records, directoryOffset, options) {
-  const documents = [], nativeEntries = [], names = new Set();
+  const documents = [], nativeEntries = [], nativeBundles = [], names = new Set();
+  let externalParts = [];
+  let external = null;
   let nextOffset = AMPF_HEADER_LENGTH + FROZEN_METADATA_HEADER_LENGTH;
   let firstZip = null;
   const folders = [];
@@ -659,6 +661,34 @@ function inspectDirectDependencies(buffer, records, directoryOffset, options) {
     }
     names.add(record.name);
     nextOffset = end;
+    const data = buffer.subarray(start, end);
+    if (externalParts.length) {
+      const part = externalParts.shift();
+      if (record.type !== "\0\0\0\0" || record.name !== `${external.name.slice(0, -4)}/${part}`) {
+        throw new Error("Invalid native external resource order or name");
+      }
+      external[part] = data;
+      if (!externalParts.length) {
+        const zip = parseEmbeddedZipEntries(external.zipfile, 0, options);
+        if (zip.archiveCount !== 1 || zip.tailOffset !== external.zipfile.length) {
+          throw new Error("Invalid native external ZIP payload");
+        }
+        external.entries = zip.entries;
+        nativeBundles.push(external);
+        external = null;
+      }
+      continue;
+    }
+    if (record.type === "iLaX") {
+      if (firstZip !== null || !/^[a-zA-Z0-9_-]+\.mxo$/.test(record.name) ||
+          data.length !== 4 || data.readUInt32BE(0) !== 0) {
+        throw new Error("Invalid native external marker");
+      }
+      external = { name: record.name };
+      externalParts = ["zipfile", "executable", "plist"];
+      continue;
+    }
+    if (record.type === "\0\0\0\0") throw new Error("Orphan native external resource");
     if (record.type === "fold") {
       firstZip ??= start;
       folders.push(record);
@@ -667,7 +697,6 @@ function inspectDirectDependencies(buffer, records, directoryOffset, options) {
     if (firstZip !== null || record.name !== pathBasename(record.name)) {
       throw new Error("Frozen AMXD has invalid native dependency ordering or name");
     }
-    const data = buffer.subarray(start, end);
     if (record.type === "JSON") {
       if (!/\.(amxd|maxpat)$/.test(record.name)) throw new Error("Invalid native patcher name");
       const jsonEnd = findJsonDocumentEnd(buffer, start, end);
@@ -679,7 +708,7 @@ function inspectDirectDependencies(buffer, records, directoryOffset, options) {
       nativeEntries.push({ name: record.name, data });
     }
   }
-  if (nextOffset !== directoryOffset || firstZip === null || !documents[0]?.patcher) throw new Error("Incomplete native frozen payload");
+  if (externalParts.length || nextOffset !== directoryOffset || firstZip === null || !documents[0]?.patcher) throw new Error("Incomplete native frozen payload");
   const archive = parseEmbeddedZipEntries(buffer, firstZip, options);
   assertFrozenMetadataDirectory(buffer, archive.tailOffset);
   if (archive.tailOffset !== directoryOffset || folders.length !== archive.archives.length) throw new Error("Native ZIP directory mismatch");
@@ -689,7 +718,7 @@ function inspectDirectDependencies(buffer, records, directoryOffset, options) {
   }
   const patcher = documents[0].patcher;
   return {
-    documents, entries: archive.entries, nativeEntries,
+    documents, entries: archive.entries, nativeEntries, nativeBundles,
     nativeDirectory: { documentNames: records.filter(r => r.type === "JSON").map(r => r.name), folderNames: folders.map(r => r.name), recordCount: records.length },
     validation: { zipOffset: firstZip, zipArchiveCount: archive.archiveCount, zipTailOffset: directoryOffset,
       jsonDocumentCount: documents.length, zipEntryCount: archive.entries.length, nativeDependencyCount: nativeEntries.length,

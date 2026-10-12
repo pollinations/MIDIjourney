@@ -5,7 +5,7 @@ import { ROOT, verifyBuild } from "./release-lib.mjs";
 
 await verifyBuild();
 const patch = await readFile(
-	resolve(ROOT, "dist/Midi Journey 2.maxpat"),
+	resolve(ROOT, "dist/MIDI Journey 2.maxpat"),
 	"utf8",
 );
 assert.doesNotMatch(

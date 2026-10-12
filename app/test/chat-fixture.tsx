@@ -1,14 +1,28 @@
 // Test-only entry. Real App, SDK provider, generation client and Max transport;
 // fake network and fake Live. No paid calls or real credentials leave this page.
-import { PolliProvider } from "@pollinations/sdk/react";
+import {
+	PolliProvider,
+	useAuthActions,
+	useAuthState,
+} from "@pollinations/sdk/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import managedReplies from "../../core/test/fixtures/managed-agent-replies.json";
 import { App } from "../src/App";
+import { BrowserConnect } from "../src/BrowserConnect";
+import { DevicePanel } from "../src/DevicePanel";
+import { SurfaceSession } from "../src/SurfaceSession";
 import "../src/style.css";
 
-const signedOut =
-	new URLSearchParams(location.search).get("auth") === "signed-out";
+const authMode = new URLSearchParams(location.search).get("auth");
+const signedOut = authMode === "signed-out" || authMode === "connect-success";
+const browserConnect =
+	new URLSearchParams(location.search).get("surface") === "connect" ||
+	new URLSearchParams(location.search).has("code");
+const hideControls =
+	browserConnect ||
+	new URLSearchParams(location.search).get("surface") === "device" ||
+	new URLSearchParams(location.search).get("view") === "clean";
 if (signedOut)
 	history.replaceState(
 		null,
@@ -22,21 +36,86 @@ function requiredElement(id: string) {
 	return element;
 }
 
+function HydratedBrowserConnect() {
+	const { isHydrated } = useAuthState();
+	return isHydrated ? <BrowserConnect capability={"b".repeat(64)} /> : null;
+}
+
+function TestAccountConnection() {
+	const { isLoggedIn } = useAuthState();
+	const { logout } = useAuthActions();
+	if (hideControls || !isLoggedIn) return null;
+	return (
+		<button
+			type="button"
+			style={{ position: "fixed", right: 0, top: 0, zIndex: 10, fontSize: 11 }}
+			onClick={logout}
+		>
+			Disconnect test account
+		</button>
+	);
+}
+
 let destination = 1,
 	writes = 0,
 	generation = 0;
 let receive: (id: string, raw: string) => void;
+let themeReceiver: (...values: unknown[]) => void;
+// Simulated host roles, deliberately unlike the SDK brand palette.
+function sendFixtureTheme() {
+	const choice =
+		(document.getElementById("test-theme") as HTMLSelectElement)?.value ||
+		new URLSearchParams(location.search).get("theme") ||
+		"dark";
+	const light = choice === "light";
+	const color = (hex: string) => [
+		...(hex.match(/../g) || []).map((v) => parseInt(v, 16) / 255),
+		1,
+	];
+	const palette = {
+		background: color(light ? "e5e5e5" : "333333"),
+		text: color(light ? "222222" : "dddddd"),
+		surface: color(light ? "ffffff" : "252525"),
+		controlOff: color(light ? "d0d0d0" : "414141"),
+		textOff: color(light ? "222222" : "dddddd"),
+		controlOn: color(
+			choice === "teal" ? "75d8c3" : light ? "606060" : "cccccc",
+		),
+		textOn: color(light ? "ffffff" : "171717"),
+		disabled: color(light ? "d5d5d5" : "484848"),
+		disabledText: color(light ? "909090" : "858585"),
+		muted: color(light ? "666666" : "a0a0a0"),
+		border: color(light ? "b0b0b0" : "555555"),
+		focus: color(choice === "teal" ? "75d8c3" : light ? "606060" : "cccccc"),
+		selection: color(light ? "606060" : "cccccc"),
+		selectionText: color(light ? "ffffff" : "171717"),
+		scrollbar: color(light ? "999999" : "777777"),
+		display: color(light ? "f5f5f5" : "202020"),
+		displayText: color(light ? "222222" : "dddddd"),
+		displayMuted: color(light ? "999999" : "555555"),
+		displayLine: color(light ? "dddddd" : "303030"),
+		displayShape: color(
+			choice === "teal" ? "75d8c3" : light ? "505050" : "bfbfbf",
+		),
+		alert: color(light ? "606060" : "cccccc"),
+		success: color(light ? "222222" : "dddddd"),
+	};
+	themeReceiver?.(light ? "light" : "dark", JSON.stringify(palette));
+}
 const host = window as unknown as {
 	max: {
-		bindInlet: (name: string, callback: typeof receive) => void;
+		bindInlet: (name: string, callback: (...values: unknown[]) => void) => void;
 		outlet: (...values: string[]) => void;
 	};
 };
 host.max = {
-	bindInlet: (_name, callback) => {
-		receive = callback;
+	bindInlet: (name, callback) => {
+		if (name === "response") receive = (id, raw) => callback(id, raw);
+		if (name === "theme") themeReceiver = callback;
 	},
 	outlet: (action, id, raw) => {
+		if (action === "theme") queueMicrotask(sendFixtureTheme);
+		if (action === "account") document.body.dataset.accountDestination = id;
 		if (action === "context")
 			queueMicrotask(() =>
 				receive(
@@ -45,6 +124,11 @@ host.max = {
 						ok: true,
 						context: {
 							connected: true,
+							clipId: (
+								document.getElementById("test-occupied") as HTMLInputElement
+							)?.checked
+								? 42
+								: 0,
 							target: `track-${destination}`,
 							destination: `MIDI ${destination} · empty slot 1`,
 							source: (
@@ -52,6 +136,7 @@ host.max = {
 							)?.checked
 								? {
 										title: "Selected melody",
+										color: 0xff33d8,
 										key: "E minor",
 										duration: 8,
 										notes: [
@@ -76,7 +161,16 @@ host.max = {
 			);
 		if (action === "create") {
 			const request = JSON.parse(raw);
-			const ok = request.target === `track-${destination}`;
+			const writeResult = (
+				document.getElementById("test-write-result") as HTMLSelectElement
+			)?.value;
+			const writeError =
+				writeResult === "mismatch"
+					? "Live did not confirm the MIDI notes. Note 57 duration differs by 0.150000. Inspect the clip; no write was retried."
+					: writeResult === "failure"
+						? "Live could not write the clip. Fixture failure. Inspect it and use Undo if needed; no write was retried."
+						: "";
+			const ok = request.target === `track-${destination}` && !writeError;
 			if (ok) {
 				writes++;
 				requiredElement("test-writes").textContent =
@@ -92,7 +186,7 @@ host.max = {
 									noteCount: request.clip.notes.length,
 									destination: `MIDI ${destination} · empty slot 1`,
 								}
-							: { ok: false, error: "Selection changed" },
+							: { ok: false, error: writeError || "Selection changed" },
 					),
 				),
 			);
@@ -100,6 +194,7 @@ host.max = {
 	},
 };
 const originalFetch = window.fetch.bind(window);
+let connectionDelivered = false;
 window.fetch = async (input, options) => {
 	const url = new URL(
 		typeof input === "string"
@@ -110,21 +205,40 @@ window.fetch = async (input, options) => {
 		location.href,
 	);
 	if (
-		signedOut &&
+		(signedOut || browserConnect) &&
 		url.origin === location.origin &&
 		url.pathname.startsWith("/api/auth/")
-	)
+	) {
+		if (
+			browserConnect &&
+			new URLSearchParams(location.search).get("auth-error") === "expired"
+		)
+			return new Response("", { status: 403 });
+		if (authMode === "connect-success" && url.pathname.endsWith("/status"))
+			return Response.json({
+				status: "received",
+				apiKey: "not-a-real-user-key",
+			});
+		if (browserConnect && url.pathname.endsWith("/complete"))
+			connectionDelivered = true;
 		return Response.json({
-			status:
-				url.pathname.endsWith("/status") &&
-				new URLSearchParams(location.search).get("auth-error") === "timeout"
+			status: connectionDelivered
+				? "delivered"
+				: url.pathname.endsWith("/status") &&
+						new URLSearchParams(location.search).get("auth-error") === "timeout"
 					? "expired"
 					: "pending",
 		});
+	}
+	if (browserConnect && url.pathname === "/api/oauth/token")
+		return Response.json({ access_token: "not-a-real-authorized-key" });
 	if (url.origin === location.origin) return originalFetch(input, options);
 	let payload: unknown;
 	if (url.origin === "https://enter.pollinations.ai")
 		payload = {
+			id: "fixture-key",
+			pollenBudget: 5,
+			permissions: { account: ["profile", "usage"], models: ["all"] },
 			name: "Test musician",
 			githubUsername: "fixture-user",
 			image: null,
@@ -205,15 +319,34 @@ window.fetch = async (input, options) => {
 		headers: { "Content-Type": "application/json" },
 	});
 };
-const storage = {
-	getItem: (key: string) =>
-		!signedOut && key.endsWith(":token") ? "not-a-real-user-key" : null,
-	setItem: () => {},
-	removeItem: () => {},
-};
+if (signedOut) localStorage.removeItem("polli:pk_fixture_application:token");
+else if (!localStorage.getItem("polli:pk_fixture_application:token"))
+	localStorage.setItem(
+		"polli:pk_fixture_application:token",
+		"not-a-real-user-key",
+	);
 createRoot(requiredElement("root")).render(
 	<StrictMode>
-		<section style={{ fontSize: 11, height: 44 }} aria-label="Test controls">
+		<section
+			style={{
+				fontSize: 11,
+				height: 44,
+				display: hideControls ? "none" : undefined,
+			}}
+			aria-label="Test controls"
+		>
+			<select
+				id="test-theme"
+				aria-label="Live theme"
+				defaultValue={
+					new URLSearchParams(location.search).get("theme") || "dark"
+				}
+				onChange={sendFixtureTheme}
+			>
+				<option value="dark">Dark neutral</option>
+				<option value="light">Light neutral</option>
+				<option value="teal">Custom teal</option>
+			</select>{" "}
 			<select
 				id="test-response"
 				aria-label="Test response format"
@@ -238,6 +371,9 @@ createRoot(requiredElement("root")).render(
 				<input id="test-source" type="checkbox" /> Selected MIDI
 			</label>{" "}
 			<label>
+				<input id="test-occupied" type="checkbox" /> Occupied slot
+			</label>{" "}
+			<label>
 				<input id="test-delay" type="checkbox" />
 				Delay reply
 			</label>{" "}
@@ -245,16 +381,44 @@ createRoot(requiredElement("root")).render(
 				<input id="test-fail" type="checkbox" />
 				Fail reply
 			</label>{" "}
+			<label>
+				Write result{" "}
+				<select id="test-write-result" defaultValue="ok">
+					<option value="ok">Success</option>
+					<option value="mismatch">Verification mismatch</option>
+					<option value="failure">Write failure</option>
+				</select>
+			</label>{" "}
 			<span id="test-writes">Writes: 0</span>{" "}
 			<span id="test-context">Request messages: 0</span>
 		</section>
-		<div style={{ height: "calc(100dvh - 44px)" }}>
-			<PolliProvider appKey="pk_fixture_application" storage={storage}>
-				<App />
+		<div
+			style={{
+				height: hideControls ? "100dvh" : "calc(100dvh - 44px)",
+				width:
+					new URLSearchParams(location.search).get("surface") === "device"
+						? 200
+						: undefined,
+			}}
+		>
+			<PolliProvider
+				appKey="pk_fixture_application"
+				enterUrl={browserConnect ? location.origin : undefined}
+			>
+				<SurfaceSession />
+				<TestAccountConnection />
+				{browserConnect ? (
+					<HydratedBrowserConnect />
+				) : new URLSearchParams(location.search).get("surface") === "device" ? (
+					<DevicePanel />
+				) : (
+					<App />
+				)}
 			</PolliProvider>
 		</div>
 		<style>
-			{"#root > div:nth-child(2) > div { height: calc(100dvh - 44px); }"}
+			{`#root > div:nth-child(2) > div { height: ${hideControls ? "100dvh" : "calc(100dvh - 44px)"}; }
+			.mj-device-controls { height: 169px; }`}
 		</style>
 	</StrictMode>,
 );

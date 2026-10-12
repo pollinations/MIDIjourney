@@ -2,6 +2,7 @@ import max from "max-api";
 import { execFile } from "node:child_process";
 import { startUiServer } from "./ui-server.mjs";
 import assets from "#ui-assets";
+import { accountDestination } from "./account-links.mjs";
 let server;
 let starting;
 let liveContext = { connected: false };
@@ -13,10 +14,11 @@ function start() {
     try {
       server = await startUiServer({ assets, getContext: () => liveContext });
       max.outlet("uiurl", server.editorUrl);
-      max.outlet("panel", "ready");
+      const controlsUrl = new URL(server.editorUrl);
+      controlsUrl.searchParams.set("surface", "device");
+      max.outlet("controlsurl", controlsUrl.href);
     } catch {
-      max.outlet("panel", "unavailable");
-      max.post("Midi Journey 2: close another Midi Journey 2 device or preview using port 5178, then click the device image to retry.", max.POST_LEVELS.ERROR);
+      max.post("MIDI Journey 2: close another MIDI Journey 2 device or preview using port 5178, then reload the device to retry.", max.POST_LEVELS.ERROR);
     }
   })().finally(() => { starting = undefined; });
   return starting;
@@ -29,12 +31,13 @@ max.addHandler("context", (raw) => {
     liveContext = { connected: value.connected === true, destination: value.destination, error: value.error };
   } catch { liveContext = { connected: false }; }
 });
-max.addHandler("dashboard", () => {
-  const url = "https://enter.pollinations.ai/pollen";
+max.addHandler("account", (raw) => {
+  const url = accountDestination(raw);
+  if (!url) return;
   const executable = process.platform === "win32" ? "rundll32" : process.platform === "darwin" ? "/usr/bin/open" : "xdg-open";
   const args = process.platform === "win32" ? ["url.dll,FileProtocolHandler", url] : [url];
   execFile(executable, args, { timeout: 10000 }, (error) => {
-    if (error) max.post("Could not open the Pollinations dashboard.", max.POST_LEVELS.ERROR);
+    if (error) max.post("Could not open the Pollinations account page.", max.POST_LEVELS.ERROR);
   });
 });
 process.once("SIGTERM", () => {

@@ -9,6 +9,7 @@ import {
 	resolveMidiInputs,
 	snapshotMidiInput,
 } from "./midi-input.mjs";
+import { clipWriteFeedback } from "./reply-presentation.mjs";
 // One active conversation, no archive. Explicit dependencies allow tests without
 // charging Pollen or touching a Live Set.
 export function createChatSession({
@@ -52,9 +53,10 @@ export function createChatSession({
 		epoch++;
 		active = null;
 		current.generator?.cancel();
+		console.info("MIDI Journey 2: generation canceled.");
 		updateTurn(current.id, {
 			status: "canceled",
-			error: "Generation canceled.",
+			error: undefined,
 		});
 		emit({ busyId: null });
 	}
@@ -72,10 +74,10 @@ export function createChatSession({
 		},
 		cancel,
 		newChat() {
-			// A dispatched Live mutation cannot be canceled. Wait for its receipt.
-			if (state.sendingId) return false;
 			cancel();
 			epoch++;
+			// Clear history immediately, but retain sendingId until any dispatched
+			// Live write finishes. Its receipt cannot recreate the removed turn.
 			emit({
 				draft: "",
 				turns: [],
@@ -198,7 +200,9 @@ export function createChatSession({
 					notice: `Created ${ack.noteCount} notes in ${ack.destination}.`,
 				});
 			} catch (failure) {
-				updateTurn(id, { writeError: safeError(failure) });
+				const detail = safeError(failure);
+				console.warn("MIDI Journey 2: clip write", detail);
+				updateTurn(id, { writeError: clipWriteFeedback(detail) });
 			} finally {
 				emit({ sendingId: null });
 			}

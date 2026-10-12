@@ -122,8 +122,9 @@ test("follow-ups keep conversation context and every MIDI reply remains sendable
 	assert.equal(h.session.getSnapshot().turns.length, 2);
 });
 test("new chat cancels generation; late replies and call logs cannot repopulate it", async () => {
-	const h = harness(),
-		{ promise, job } = await h.start();
+	const h = harness();
+	await h.finish();
+	const { promise, job } = await h.start("Another variation");
 	h.session.newChat();
 	assert.equal(job.canceled, true);
 	job.onCall({ id: 100, status: "Received" });
@@ -152,6 +153,7 @@ test("cancel preserves the exchange and drafted follow-up but not failed model c
 	job.resolve({ ...result, history });
 	await promise;
 	assert.equal(h.session.getSnapshot().turns[0].status, "canceled");
+	assert.equal(h.session.getSnapshot().turns[0].error, undefined);
 	assert.equal(h.session.getSnapshot().draft, "next idea");
 	assert.deepEqual(h.session.getSnapshot().context, []);
 });
@@ -240,31 +242,57 @@ test("chat normalization rejects invalid MIDI, bounds explanations and strips ex
 	});
 	assert.equal(invalid.turns[0].result, undefined);
 });
-test("duplicate clip dispatch is blocked, reset waits for a dispatched write", async () => {
-	const pending = deferred();
-	let writes = 0;
-	const session = createChatSession({
-		initial: {
-			...normalizeChat(null),
-			turns: [{ id: "x", prompt: "x", result, calls: [] }],
-		},
-		createGenerator: () => {
-			throw new Error("not used");
-		},
-		readContext: async () => ({}),
-		writeClip: () => {
-			writes++;
-			return pending.promise;
-		},
+for (const outcome of ["success", "failure"]) {
+	test(`reset clears history during a write; late ${outcome} only releases the write lock`, async (t) => {
+		t.mock.method(console, "warn", () => {});
+		const pending = deferred();
+		let writes = 0,
+			generations = 0;
+		const session = createChatSession({
+			initial: {
+				...normalizeChat(null),
+				turns: [{ id: "x", prompt: "x", result, calls: [] }],
+			},
+			createGenerator: () => {
+				generations++;
+				return {
+					generate: async ({ history }) => {
+						assert.deepEqual(history, []);
+						return { ...result, history: [] };
+					},
+				};
+			},
+			readContext: async () => ({}),
+			writeClip: () => {
+				writes++;
+				return pending.promise;
+			},
+		});
+		const write = session.send("x", { connected: true, target: "t" });
+		await session.send("x", { connected: true, target: "t" });
+		assert.equal(writes, 1);
+		assert.equal(session.newChat(), true);
+		assert.deepEqual(session.getSnapshot().turns, []);
+		assert.deepEqual(session.getSnapshot().context, []);
+		assert.equal(session.getSnapshot().sendingId, "x");
+		session.setDraft("Fresh idea");
+		await session.generate();
+		await session.send("x", { connected: true, target: "t" });
+		assert.equal(generations, 0);
+		assert.equal(writes, 1);
+		if (outcome === "success")
+			pending.resolve({ noteCount: 1, destination: "MIDI" });
+		else pending.reject(new Error("Write failed"));
+		await write;
+		assert.deepEqual(session.getSnapshot().turns, []);
+		assert.equal(session.getSnapshot().sendingId, null);
+		assert.equal(session.getSnapshot().draft, "Fresh idea");
+		await session.generate();
+		assert.equal(generations, 1);
+		assert.equal(session.getSnapshot().turns.length, 1);
+		assert.equal(session.getSnapshot().turns[0].prompt, "Fresh idea");
 	});
-	const write = session.send("x", { connected: true, target: "t" });
-	await session.send("x", { connected: true, target: "t" });
-	assert.equal(writes, 1);
-	assert.equal(session.newChat(), false);
-	pending.resolve({ noteCount: 1, destination: "MIDI" });
-	await write;
-	assert.equal(session.newChat(), true);
-});
+}
 
 test("duplicate send-message events cannot start two generations", async () => {
 	const h = harness();
@@ -305,4 +333,35 @@ test("a fresh chat works without storage and never inherits another instance's d
 	assert.equal(next.getSnapshot().draft, "");
 	assert.deepEqual(next.getSnapshot().turns, []);
 	assert.deepEqual(next.getSnapshot().context, []);
+});
+
+test("write verification details go to the console while the chat stays concise, with no retry", async (t) => {
+	const warn = t.mock.method(console, "warn", () => {});
+	const detail =
+		"Live did not confirm the MIDI notes. Note 57 duration differs by 0.150000. Inspect the clip; no write was retried.";
+	let writes = 0;
+	const session = createChatSession({
+		initial: {
+			...freshChat(),
+			turns: [{ id: "clip", status: "complete", result }],
+		},
+		writeClip: async () => {
+			writes++;
+			throw new Error(detail);
+		},
+	});
+	await session.send("clip", { connected: true, target: "selected-slot" });
+	const state = session.getSnapshot();
+	assert.equal(writes, 1);
+	assert.equal(state.sendingId, null);
+	assert.equal(
+		state.turns[0].writeError,
+		"Couldn't confirm the clip. Check it in Live before writing again.",
+	);
+	assert.doesNotMatch(JSON.stringify(state), /Note 57|0\.150000/);
+	assert.deepEqual(warn.mock.calls[0].arguments, [
+		"MIDI Journey 2: clip write",
+		detail,
+	]);
+	assert.deepEqual(state.turns[0].result, result);
 });

@@ -1,4 +1,4 @@
-name: Verify Midi Journey 2
+name: Verify MIDI Journey 2
 
 on: [push, pull_request]
 
@@ -7,7 +7,7 @@ permissions:
 
 jobs:
   source:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
@@ -19,6 +19,11 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      - name: Get pinned Max SDK headers
+        run: |
+          git clone https://github.com/Cycling74/max-sdk-base.git "$RUNNER_TEMP/max-sdk-base"
+          git -C "$RUNNER_TEMP/max-sdk-base" checkout c03a2922a2a8ff149165a1e2ea134e9321d6e202
+          echo "MAX_SDK_PATH=$RUNNER_TEMP/max-sdk-base" >> "$GITHUB_ENV"
       - run: npm run verify
       # Native Max freezing and real Live acceptance cannot run on this runner.
       # No key or deploy credential is needed for source verification.

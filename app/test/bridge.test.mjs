@@ -4,11 +4,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
 import { createChatSession } from "../src/chat-session.mjs";
-import {
-	createClip,
-	currentContext,
-	reportPollinationsConnection,
-} from "../src/jweb.mjs";
+import { createClip, currentContext, showEditor } from "../src/jweb.mjs";
 import { normalizeChat } from "../src/session.mjs";
 
 const { buildRequest } = createRequire(import.meta.url)(
@@ -16,21 +12,14 @@ const { buildRequest } = createRequire(import.meta.url)(
 );
 const { CONFIG } = createRequire(import.meta.url)("../../core/config.js");
 
-test("native artwork receives only boolean SDK login state, not credentials", () => {
+test("Open chat asks Live to show the existing editor", () => {
 	const sent = [];
 	const host = {
 		max: { bindInlet() {}, outlet: (...args) => sent.push(args) },
 	};
-	for (const state of [true, false, "not-a-boolean"]) {
-		const stop = reportPollinationsConnection(host, state);
-		stop();
-	}
-	assert.deepEqual(sent, [
-		["pollinations", 1],
-		["pollinations", 0],
-		["pollinations", 0],
-	]);
-	assert.doesNotThrow(() => reportPollinationsConnection({}, true)());
+	showEditor(host);
+	assert.deepEqual(sent, [["editor", "show"]]);
+	assert.doesNotThrow(() => showEditor({}));
 });
 
 const source = await readFile(
@@ -291,7 +280,7 @@ test("native writer accepts the shared output limits and rejects values beyond t
 		/Invalid MIDI clip/,
 	);
 	assert.throws(
-		() => h.context.validate({ ...longClip, title: longClip.title + "x" }),
+		() => h.context.validate({ ...longClip, title: `${longClip.title}x` }),
 		/Invalid MIDI clip/,
 	);
 	assert.throws(
@@ -677,6 +666,21 @@ test("Arrangement input follows detail_clip, but cannot replace a hidden Session
 	assert.equal(h.target().connected, false);
 	assert.deepEqual(h.target().source.notes, fixture.notes);
 	assert.ok(h.calls.every((call) => call[1] === "get_all_notes_extended"));
+});
+
+test("clip color follows in-place changes without rereading MIDI notes", () => {
+	const h = harness(),
+		clip = h.input();
+	clip.color = [0xff33d8];
+	assert.equal(h.target().source.color, 0xff33d8);
+	const reads = h.calls.length;
+	clip.color = [0x123456];
+	assert.equal(h.target().source.color, 0x123456);
+	assert.equal(h.calls.length, reads);
+	clip.color = [-1];
+	assert.equal(h.target().source.color, undefined);
+	h.select(10, 21);
+	assert.equal(h.target().source, null);
 });
 
 test("fresh input rereads in-place edits, and clearing or selecting audio removes old input", () => {

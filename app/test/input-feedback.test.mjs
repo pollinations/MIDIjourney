@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CONFIG } from "../.generated/midi-core.mjs";
 import { createChatSession } from "../src/chat-session.mjs";
+import { midiBadgeStyle } from "../src/midi-color.mjs";
 import {
 	midiInputFeedback,
 	normalizeMidiInput,
@@ -157,4 +158,26 @@ test("saved input receipts are bounded and old exchanges never invent attachment
 		}).turns[0].input,
 		undefined,
 	);
+});
+
+test("clip badge keeps real RGB colors and readable text, with a neutral fallback", () => {
+	assert.deepEqual(midiBadgeStyle(0), {
+		backgroundColor: "#000000",
+		color: "#ffffff",
+	});
+	assert.deepEqual(midiBadgeStyle(0xffffff), {
+		backgroundColor: "#ffffff",
+		color: "#000000",
+	});
+	assert.deepEqual(midiBadgeStyle(0xff33d8), {
+		backgroundColor: "#ff33d8",
+		color: "#000000",
+	});
+	for (const color of [null, undefined, -1, 0x1000000, 1.5, "#ffffff"])
+		assert.equal(midiBadgeStyle(color), undefined);
+	const summary = midiInputFeedback({
+		source: { ...source, color: 0xff33d8 },
+	}).summary;
+	assert.equal(summary.color, 0xff33d8);
+	assert.equal(normalizeMidiInput(summary).color, summary.color);
 });

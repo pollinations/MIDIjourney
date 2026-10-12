@@ -7,18 +7,12 @@ export function isJweb(host) {
 		typeof host?.max?.bindInlet === "function"
 	);
 }
-// Publish only a boolean; no account identity, balance or key reaches Max.
-export function reportPollinationsConnection(host, connected) {
-	if (!isJweb(host)) return () => {};
-	const send = () =>
-		host.max.outlet("pollinations", connected === true ? 1 : 0);
-	send();
-	// Reassert after native initialization, without an HTTP request.
-	const timer = setInterval(send, 2000);
-	return () => clearInterval(timer);
+export function showEditor(host) {
+	if (isJweb(host)) host.max.outlet("editor", "show");
 }
 export function bridge(host) {
-	if (!isJweb(host)) throw new Error("Open MIDI Journey from its Live device.");
+	if (!isJweb(host))
+		throw new Error("Open MIDI Journey 2 from its Live device.");
 	if (bridges.has(host)) return bridges.get(host);
 	const pending = new Map();
 	let sequence = 0;
@@ -45,7 +39,8 @@ export function bridge(host) {
 	host.max.bindInlet("responsepart", (id, index, total, text) => {
 		const waiting = pending.get(String(id));
 		if (!waiting) return;
-		const parts = waiting.parts || (waiting.parts = []);
+		if (!waiting.parts) waiting.parts = [];
+		const parts = waiting.parts;
 		if (
 			!Number.isInteger(total) ||
 			total < 1 ||

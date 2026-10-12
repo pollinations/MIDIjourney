@@ -12,6 +12,7 @@ export async function sourceFingerprint(root, appKey) {
 		"app/index.html",
 		"app/tsconfig.json",
 		"scripts/build.mjs",
+		"scripts/build-native.mjs",
 		"scripts/build-core.mjs",
 		"scripts/device.mjs",
 		"scripts/source-fingerprint.mjs",

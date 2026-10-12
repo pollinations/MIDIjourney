@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { NATIVE_BUNDLE, NATIVE_FILES, NATIVE_NAME } from "./build-native.mjs";
 import { sourceFingerprint } from "./source-fingerprint.mjs";
 
 const require = createRequire(import.meta.url);
@@ -15,17 +16,12 @@ export const RUNTIME_FILES = [
 	"midijourney-window.js",
 	"midijourney-panel.js",
 ];
-export const MEDIA_FILES = [
-	"open-connected",
-	"open-disconnected",
-	"close-connected",
-	"close-disconnected",
-].map((state) => `midijourney-${state}.png`);
-export const EMBEDDED_FILES = [...RUNTIME_FILES, ...MEDIA_FILES];
+export const EMBEDDED_FILES = [...RUNTIME_FILES];
 export const BUILD_FILES = [
 	...EMBEDDED_FILES,
-	"Midi Journey 2.maxpat",
-	"Midi Journey 2.source.amxd",
+	...NATIVE_FILES,
+	"MIDI Journey 2.maxpat",
+	"MIDI Journey 2.source.amxd",
 ];
 export const sha256 = (value) =>
 	createHash("sha256").update(value).digest("hex");
@@ -38,7 +34,7 @@ export async function verifyBuild(
 		await readFile(resolve(directory, "build-manifest.json"), "utf8"),
 	);
 	assert.equal(manifest.format, "midi-journey-build-v1");
-	assert.equal(manifest.version, "3.0.0");
+	assert.equal(manifest.version, require("../package.json").version);
 	const { CONFIG, hasConfiguredAppKey } = require("../core/config.js");
 	assert.equal(
 		manifest.source,
@@ -109,6 +105,17 @@ export function verifyPatcher(actual, expected, { nativeSaved = false } = {}) {
 			found.text === undefined
 		)
 			found = { ...found, maxclass: "newobj", text: box.text };
+		// Max removes redundant quotes around these bare Live color symbols.
+		// Limit this equivalence to the palette query; all atoms and separators
+		// must otherwise match, and every other message keeps exact comparison.
+		if (
+			nativeSaved &&
+			box.id === "get-colors" &&
+			box.maxclass === "message" &&
+			/^"live_[a-z_]+"(?:, "live_[a-z_]+")*$/.test(box.text) &&
+			found.text === box.text.replace(/"(live_[a-z_]+)"/g, "$1")
+		)
+			found = { ...found, text: box.text };
 		for (const key of [
 			"maxclass",
 			"text",
@@ -144,7 +151,7 @@ export async function verifyFrozen(file, directory = resolve(ROOT, "dist")) {
 	const buffer = await readFile(file);
 	const frozen = inspectFrozenAmxd(buffer);
 	const patcher = JSON.parse(
-		await readFile(resolve(directory, "Midi Journey 2.maxpat"), "utf8"),
+		await readFile(resolve(directory, "MIDI Journey 2.maxpat"), "utf8"),
 	).patcher;
 	for (const document of frozen.documents)
 		verifyPatcher(document.patcher, patcher, { nativeSaved: true });
@@ -164,6 +171,20 @@ export async function verifyFrozen(file, directory = resolve(ROOT, "dist")) {
 			`Embedded ${name} differs from the build`,
 		);
 	}
+	// Native bundles retain their directory layout inside Max's ZIP archive.
+	const nativeBundleEntries = [];
+	for (const name of NATIVE_FILES) {
+		const matches = frozen.entries.filter(
+			(entry) => entry.name === name || entry.name.endsWith(`/${name}`),
+		);
+		assert.equal(matches.length, 1, `Expected exactly one embedded ${name}`);
+		assert.equal(
+			sha256(matches[0].data),
+			manifest.files[name],
+			`Embedded ${name} differs from the build`,
+		);
+		nativeBundleEntries.push(matches[0]);
+	}
 	for (const entry of frozen.nativeEntries ?? []) {
 		assert.ok(
 			EMBEDDED_FILES.includes(entry.name),
@@ -175,15 +196,54 @@ export async function verifyFrozen(file, directory = resolve(ROOT, "dist")) {
 			`Native ${entry.name} differs from the build`,
 		);
 	}
+	// Max also stores a directly loadable copy of the native external, plus its
+	// own bundle ZIP. Check every copy, not only the project dependency archive.
+	assert.equal(frozen.nativeBundles?.length, 1, "Expected one native external");
+	const native = frozen.nativeBundles[0];
+	assert.equal(native.name, NATIVE_BUNDLE, "Stale native external identity");
+	for (const [part, name] of [
+		["executable", `${NATIVE_BUNDLE}/Contents/MacOS/${NATIVE_NAME}`],
+		["plist", `${NATIVE_BUNDLE}/Contents/Info.plist`],
+	])
+		assert.equal(sha256(native[part]), manifest.files[name], `Native ${part} differs from the build`);
+	for (const name of NATIVE_FILES) {
+		const matches = native.entries.filter((entry) => entry.name === name);
+		assert.equal(matches.length, 1, `Expected one native bundle ${name}`);
+		assert.equal(sha256(matches[0].data), manifest.files[name], `Native bundle ${name} differs from the build`);
+	}
+	const nativeMetadata = verifyMacMetadata(native.entries);
+	assert.equal(native.entries.filter((entry) =>
+		!entry.name.endsWith("/") && !NATIVE_FILES.includes(entry.name) && !nativeMetadata.includes(entry)
+	).length, 0, "Unexpected files in native bundle");
 	const extraPatchers = frozen.entries.filter(
-		(entry) => entry.name === "patchers/Midi Journey 2.maxpat",
+		(entry) => entry.name === "patchers/MIDI Journey 2.maxpat",
 	);
 	assert.ok(extraPatchers.length <= 1, "Duplicate project patcher");
 	for (const entry of extraPatchers)
 		verifyPatcher(JSON.parse(entry.data.toString("utf8")).patcher, patcher, {
 			nativeSaved: true,
 		});
-	const metadata = frozen.entries.filter((entry) =>
+	const metadata = verifyMacMetadata(frozen.entries);
+	const unexpected = frozen.entries.filter(
+		(entry) =>
+			!entry.name.endsWith("/") &&
+			!EMBEDDED_FILES.includes(basename(entry.name)) &&
+			!extraPatchers.includes(entry) &&
+			!nativeBundleEntries.includes(entry) &&
+			!metadata.includes(entry),
+	);
+	assert.equal(unexpected.length, 0, "Unexpected files embedded in device");
+	return {
+		version: manifest.version,
+		sha256: sha256(buffer),
+		bytes: buffer.length,
+		embeddedFiles: [...EMBEDDED_FILES, ...NATIVE_FILES],
+		validation: frozen.validation,
+	};
+}
+
+function verifyMacMetadata(entries) {
+	const metadata = entries.filter((entry) =>
 		entry.name.startsWith("__MACOSX/"),
 	);
 	// Max adds an AppleDouble record containing only macOS provenance. Reject
@@ -206,23 +266,9 @@ export async function verifyFrozen(file, directory = resolve(ROOT, "dist")) {
 			.replace(/^__MACOSX\//, "")
 			.replace(/\/\._([^/]+)$/, "/$1");
 		assert.ok(
-			frozen.entries.some((other) => other.name === original),
+			entries.some((other) => other.name === original),
 			"Orphan macOS metadata",
 		);
 	}
-	const unexpected = frozen.entries.filter(
-		(entry) =>
-			!entry.name.endsWith("/") &&
-			!EMBEDDED_FILES.includes(basename(entry.name)) &&
-			!extraPatchers.includes(entry) &&
-			!metadata.includes(entry),
-	);
-	assert.equal(unexpected.length, 0, "Unexpected files embedded in device");
-	return {
-		version: manifest.version,
-		sha256: sha256(buffer),
-		bytes: buffer.length,
-		embeddedFiles: EMBEDDED_FILES,
-		validation: frozen.validation,
-	};
+	return metadata;
 }
