@@ -30,8 +30,12 @@ int main(void) { @autoreleasepool {
     assert(NSEqualSizes(window.contentMinSize, NSMakeSize(420,324)));
     assert(NSEqualSizes(window.contentMaxSize, NSMakeSize(720,1400)));
     // Closing/reopening must never restore the initial frame or a shared size.
-    [window setFrameOrigin:NSMakePoint(320,240)];
     [window setContentSize:NSMakeSize(600,450)];
+    // Keep the fixture on its actual screen. AppKit moves off-screen windows
+    // when first shown, independently of our close/reopen behavior.
+    NSRect visible = window.screen.visibleFrame;
+    [window setFrameOrigin:NSMakePoint(NSMinX(visible)+20, NSMinY(visible)+20)];
+    assert(NSContainsRect(visible, window.frame));
     NSRect resized = window.frame;
     [window close];
     keepEditorsVisible();
